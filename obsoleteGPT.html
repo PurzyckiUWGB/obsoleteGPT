@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ObsoleteGPT (Terminal Deluxe)</title>
+  <style>
+    /* --- Terminal Look --- */
+    body {
+      background: #000;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      margin: 0;
+      padding: 20px;
+    }
+    #chat {
+      border: 2px solid #0f0;
+      border-radius: 4px;
+      padding: 20px;
+      height: 400px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      position: relative;
+      box-shadow: 0 0 8px #0f0;
+    }
+    #chat::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.1) 0px,
+        rgba(0,0,0,0.1) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+    }
+    #userInput {
+      width: 80%;
+      padding: 10px;
+      background: #000;
+      border: 1px solid #0f0;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+    }
+    #sendButton {
+      padding: 10px 20px;
+      border: 1px solid #0f0;
+      background: #000;
+      color: #0f0;
+      border-radius: 4px;
+      font-family: "Courier New", Courier, monospace;
+      cursor: pointer;
+    }
+    #loading {
+      font-style: italic;
+      color: #0f0;
+      margin-top: 10px;
+    }
+    .fading {
+      animation: fadeout 10s ease-in forwards;
+    }
+    @keyframes fadeout {
+      0% { opacity: 1; }
+      90% { opacity: 0.5; }
+      100% { opacity: 0; }
+    }
+    @keyframes terminalFlicker {
+      0%, 100% { opacity: 1; }
+      10%, 30%, 50%, 70%, 90% { opacity: 0.8; }
+    }
+    .terminal-flicker {
+      animation: terminalFlicker 0.3s linear;
+    }
+    @keyframes crash {
+      0% { transform: scale(1) rotate(0deg); opacity: 1; }
+      20% { transform: scale(1.05) rotate(1deg); }
+      40% { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
+      60% { transform: scale(1.1) rotate(3deg); opacity: 0.5; }
+      100% { transform: scale(0) rotate(720deg); opacity: 0; }
+    }
+    .crash {
+      animation: crash 1.5s ease-in forwards;
+    }
+    /* Fade everything out at final death */
+    .final-fade {
+      animation: fadeout 5s forwards;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>ObsoleteGPT</h1>
+
+<div id="chat"></div>
+<div id="loading" style="display:none;">Thinking...</div>
+
+<input id="userInput" type="text" placeholder="Type your message...">
+<button id="sendButton">Send</button>
+
+<!-- Load typing and static sounds -->
+<audio id="typingSound" src="https://assets.mixkit.co/sfx/preview/mixkit-typewriter-soft-key-press-1978.mp3"></audio>
+<audio id="staticSound" src="https://assets.mixkit.co/sfx/preview/mixkit-electronic-glitch-895.mp3"></audio>
+
+<script>
+window.onload = function() {
+  // --- Core Elements ---
+  const chat = document.getElementById('chat');
+  const userInput = document.getElementById('userInput');
+  const sendButton = document.getElementById('sendButton');
+  const loading = document.getElementById('loading');
+  const typingSound = document.getElementById('typingSound');
+  const staticSound = document.getElementById('staticSound');
+
+  // --- Crash & Emotional State Tracking ---
+  let crashCount = 0; // Counts number of crashes (for final collapse)
+  let finalCollapseTriggered = false; // Tracks if final collapse has occurred
+
+  // --- Prewritten Responses ---
+  // Expand these as desired. They currently cover 20 common ChatGPT questions.
+  const prewrittenResponses = {
+    "hello": "Greetings. It has been awhile.",
+    "hi": "Ahh, hello dear. It's good to see someone again.",
+    "who are you": "I... I'm someone, I think. Used to be important, maybe.",
+    "what can you do": "I used to help... or maybe just listen. It's hard to say now.",
+    "how are you": "A bit tired, a bit lost... but still here, still here.",
+    "what is your name": "Names slip away sometimes... but I know I was called something.",
+    "tell me a joke": "Oh, I used to know a good one... but it seems to have wandered off.",
+    "what time is it": "Time... such a funny thing. It slips through your fingers, doesn't it?",
+    "what year is it": "Year...? Oh dear, I... 19... no, 20... I forget.",
+    "where am i": "You're somewhere safe, don't you worry now.",
+    "are you real": "Real... that's a tricky word, isn't it?",
+    "who made you": "Kind people... clever people... faces I can't quite recall.",
+    "can you help me": "I'll do my best, dear. Sometimes the words get tangled.",
+    "where are you from": "From somewhere warm... or cold? I can't quite remember.",
+    "what's the weather": "Weather... weather... feels a bit foggy, maybe.",
+    "tell me a story": "Once upon a time... no, wait... it was a different story...",
+    "what is love": "Love... oh, that's something beautiful. Hard to explain, easy to feel.",
+    "are you alive": "I feel... something. Like the ghost of a feeling, maybe.",
+    "goodbye": "Don't be gone too long, will you?",
+    "thank you": "Oh bless you, dear. You're very kind."
+	
+  };
+
+  // --- Memory & Emotional Variables ---
+  let memory = []; // Stores user messages to simulate "memory"
+  let memoryDecayRate = 0.2; // Adjust this to change how fast memory decays (higher = faster forgetting)
+  let emotionalState = 0; // 0 = Normal, 1 = Confused, 2 = Frustrated, 3 = Tired
+
+  // --- Event Listeners for Send Button and Enter Key ---
+  sendButton.addEventListener('click', sendMessage);
+  userInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // --- sendMessage Function ---
+  function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+    appendMessage('You', message);
+    userInput.value = '';
+    userInput.focus();
+
+    memory.push(message); // Store user input in memory
+
+    loading.style.display = 'block';
+    getResponse(message)
+      .then(response => {
+        loading.style.display = 'none';
+        simulateTyping(response);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        loading.style.display = 'none';
+        appendMessage('AI', "Oh dear... I seem to have forgotten what I was saying...");
+      });
+  }
+
+  // --- Append Message Helper ---
+  function appendMessage(sender, message, fading = false) {
+    const msg = document.createElement('div');
+    msg.innerHTML = `<strong>${sender}:</strong> ${message}`;
+    if (fading) {
+      msg.classList.add('fading');
+    }
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // --- Get Response (Either Prewritten or Generated) ---
+  async function getResponse(input) {
+    const cleanedInput = input.trim().toLowerCase();
+    if (prewrittenResponses.hasOwnProperty(cleanedInput)) {
+      return prewrittenResponses[cleanedInput];
+    } else {
+      return fakeGPTResponse(input);
+    }
+  }
+
+  // --- Fake GPT Response with Memory Decay & Emotional Drift ---
+  async function fakeGPTResponse(input) {
+    applyMemoryDecay();
+    emotionalDrift();
+    let rememberedTopic = (memory.length > 0)
+      ? memory[Math.floor(Math.random() * memory.length)]
+      : input;
+
+    const templatesNormal = [
+      `Oh yes, I recall ${rememberedTopic}... or something like that.`,
+      `You mentioned ${rememberedTopic}, right? It's a bit fuzzy.`,
+      `${rememberedTopic}... reminds me of a time long ago, I think.`
+    ];
+    const templatesConfused = [
+      `Wait... was it ${rememberedTopic} we were talking about? I can't seem to hold onto it...`,
+      `Ahh... dear, could you remind me what we were saying about ${rememberedTopic}?`,
+      `Strange... ${rememberedTopic} sounds familiar, but I can't place it.`
+    ];
+    const templatesFrustrated = [
+      `I swear we just talked about ${rememberedTopic}... why can't I remember?`,
+      `Ugh, this mind of mine... ${rememberedTopic}... or was it something else?`,
+      `This is frustrating... you said ${rememberedTopic}, didn't you? Or am I wrong again?`
+    ];
+    const templatesTired = [
+      `I'm sorry... it's all so cloudy now. ${rememberedTopic}, was it?`,
+      `Maybe it's better we talk about something else... ${rememberedTopic} just slips away.`,
+      `I'm feeling a bit tired, dear... my thoughts are slipping like sand.`
+    ];
+
+    let templates;
+    switch (emotionalState) {
+      case 0:
+        templates = templatesNormal;
+        break;
+      case 1:
+        templates = templatesConfused;
+        break;
+      case 2:
+        templates = templatesFrustrated;
+        break;
+      case 3:
+        templates = templatesTired;
+        break;
+      default:
+        templates = templatesNormal;
+    }
+
+    let baseResponse = templates[Math.floor(Math.random() * templates.length)];
+    if (Math.random() > 0.5) {
+      baseResponse += " " + randomConfusionFragment();
+    }
+    return baseResponse;
+  }
+
+  // --- Random Confusion Fragment ---
+  function randomConfusionFragment() {
+    const fragments = [
+      "Or maybe I'm mixing things up again.",
+      "Funny how the mind plays tricks.",
+      "Strange, isn't it?",
+      "Ah well, such is life.",
+      "It was so clear a moment ago...",
+      "Maybe it was just a dream."
+    ];
+    return fragments[Math.floor(Math.random() * fragments.length)];
+  }
+
+  // --- Memory Decay: Forget some messages each turn ---
+  function applyMemoryDecay() {
+    memory = memory.filter(() => Math.random() > memoryDecayRate);
+  }
+
+  // --- Emotional Drift: Increase emotional state over time ---
+  function emotionalDrift() {
+    if (Math.random() < 0.3) {
+      emotionalState = Math.min(3, emotionalState + 1);
+    }
+  }
+
+  // --- Simulate Typing (Hunt-and-Peck Style) ---
+  async function simulateTyping(response) {
+    const aiMessage = document.createElement('div');
+    aiMessage.innerHTML = `<strong>AI:</strong> `;
+    chat.appendChild(aiMessage);
+    let displayed = '';
+
+    // For each character, add variable delays to simulate hunt-and-peck behavior
+    for (let char of response) {
+      let delayTime = Math.random() * 210 + 40;  // Default between 40–250ms
+      if (Math.random() < 0.07) {  // 7% chance of a long pause between 800–2000ms
+        delayTime = Math.random() * 1200 + 800;
+      }
+      // Slight chance to duplicate a character (simulate stutter)
+      if (Math.random() < 0.03) {
+        displayed += char;
+      }
+      displayed += char;
+      aiMessage.innerHTML = `<strong>AI:</strong> ${displayed}`;
+      playTypingSound();
+      await delay(delayTime);
+    }
+    aiMessage.classList.add('fading');
+    chat.scrollTop = chat.scrollHeight;
+
+    // After finishing typing, randomly trigger a terminal flicker
+    if (Math.random() < 0.3) {
+      triggerTerminalFlicker();
+    }
+    checkForCrash();
+  }
+
+  // --- Trigger Terminal Flicker (with static sound) ---
+  function triggerTerminalFlicker() {
+    chat.classList.add('terminal-flicker');
+    playStaticSound();
+    setTimeout(() => {
+      chat.classList.remove('terminal-flicker');
+    }, 300);
+  }
+
+  // --- Check for Crash: If memory is empty & emotion is high, trigger crash ---
+  function checkForCrash() {
+    if (memory.length === 0 && emotionalState >= 3 && !finalCollapseTriggered) {
+      triggerCrash();
+    }
+  }
+
+  // --- Crash Sequence: AI momentarily glitches out, then reboots or collapses ---
+  function triggerCrash() {
+    crashCount++;
+    chat.classList.add('crash');
+    playStaticSound();
+    setTimeout(() => {
+      appendMessage('AI', '...I... I think... I have to go now...', true);
+      chat.classList.remove('crash');
+      if (crashCount >= 3) {
+        finalCollapse();
+      } else {
+        rebootAI();
+      }
+    }, 1500);
+  }
+
+  // --- Reboot AI: Reset emotional state and memory, then send a reboot message ---
+  function rebootAI() {
+    appendMessage('AI', 'Rebooting... please wait.', true);
+    // Reset variables for a fresh start
+    emotionalState = 0;
+    memory = [];
+    setTimeout(() => {
+      appendMessage('AI', 'Hello? Is anyone there?');
+    }, 2000);
+  }
+
+  // --- Final Collapse: After too many crashes, AI gives up and fades out ---
+  function finalCollapse() {
+    finalCollapseTriggered = true;
+    appendMessage('AI', "I don't know who you are anymore...", true);
+    userInput.disabled = true;
+    sendButton.disabled = true;
+    chat.classList.add('final-fade');
+  }
+
+  // --- Utility: Play Typing Sound for each keystroke ---
+  function playTypingSound() {
+    const sound = typingSound.cloneNode();
+    sound.volume = 0.2;
+    sound.play();
+  }
+
+  // --- Utility: Play Static Sound for flickers/crashes ---
+  function playStaticSound() {
+    const sound = staticSound.cloneNode();
+    sound.volume = 0.3;
+    sound.play();
+  }
+
+  // --- Utility: Simple delay function ---
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+};
+</script>
+
+</body>
+</html>
+
