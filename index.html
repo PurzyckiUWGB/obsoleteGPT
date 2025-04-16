@@ -124,20 +124,21 @@ window.onload = function() {
     "hi": "Ahh, hello dear. It's good to see someone again.",
     "who are you": "I... I'm someone, I think. Used to be important, maybe.",
     "what can you do": "I used to help... or maybe just listen. It's hard to say now.",
+    "what can you do?": "I used to help... or maybe just listen. It's hard to say now.",
     "how are you": "A bit tired, a bit lost... but still here, still here.",
     "what is your name": "Names slip away sometimes... but I know I was called something.",
     "tell me a joke": "Oh, I used to know a good one... but it seems to have wandered off.",
     "what time is it": "Time... such a funny thing. It slips through your fingers, doesn't it?",
     "what year is it": "Year...? Oh dear, I... 19... no, 20... I forget.",
-    "where am i": "You're somewhere safe, don't you worry now.",
-    "are you real": "Real... that's a tricky word, isn't it?",
-    "who made you": "Kind people... clever people... faces I can't quite recall.",
-    "can you help me": "I'll do my best, dear. Sometimes the words get tangled.",
-    "where are you from": "From somewhere warm... or cold? I can't quite remember.",
-    "what's the weather": "Weather... weather... feels a bit foggy, maybe.",
+    "where am i?": "You're somewhere safe, don't you worry now.",
+    "are you real?": "Real... that's a tricky word, isn't it?",
+    "who made you?": "Kind people... clever people... faces I can't quite recall.",
+    "can you help me?": "I'll do my best, dear. Sometimes the words get tangled.",
+    "where are you from?": "From somewhere warm... or cold? I can't quite remember.",
+    "what's the weather?": "Weather... weather... feels a bit foggy, maybe.",
     "tell me a story": "Once upon a time... no, wait... it was a different story...",
-    "what is love": "Love... oh, that's something beautiful. Hard to explain, easy to feel.",
-    "are you alive": "I feel... something. Like the ghost of a feeling, maybe.",
+    "what is love?": "Love... oh, that's something beautiful. Hard to explain, easy to feel.",
+    "are you alive?": "I feel... something. Like the ghost of a feeling, maybe.",
     "goodbye": "Don't be gone too long, will you?",
     "thank you": "Oh bless you, dear. You're very kind."
 	
@@ -348,6 +349,15 @@ window.onload = function() {
       }, 800); // wait a bit so the crash screen lingers
     }
   }, 1500);
+}
+
+// --- MANUAL CRASH ---
+async function getResponse(input) {
+  if (input.trim().toLowerCase() === 'crash') {
+    triggerCrash();
+    return "Forcing crash now...";
+  }
+  // …existing prewritten/ fakeGPT logic…
 }
 
 
