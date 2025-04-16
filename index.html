@@ -112,6 +112,8 @@ window.onload = function() {
   // --- Session Degradation Tracker ---
   let sessionCount = parseInt(localStorage.getItem('sessionCount')||'0',10) + 1;
   localStorage.setItem('sessionCount', sessionCount);
+  typingSound.volume = 1;   // 100% volume
+  staticSound.volume = 0.3;   // 30% volume
 
   // --- Core Elements ---
   const chat = document.getElementById('chat');
