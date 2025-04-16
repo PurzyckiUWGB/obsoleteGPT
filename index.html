@@ -330,19 +330,26 @@ window.onload = function() {
 
   // --- Crash Sequence: AI momentarily glitches out, then reboots or collapses ---
   function triggerCrash() {
-    crashCount++;
-    chat.classList.add('crash');
-    playStaticSound();
-    setTimeout(() => {
-      appendMessage('AI', '...I... I think... I have to go now...', true);
-      chat.classList.remove('crash');
-      if (crashCount >= 3) {
-        finalCollapse();
-      } else {
+  crashCount++;
+  chat.classList.add('crash');
+  playStaticSound();
+
+  setTimeout(() => {
+    appendMessage('AI', '...I... I think... I have to go now...', true);
+
+    if (crashCount >= 3) {
+      // Final “give up” — leave the screen crashed
+      finalCollapse();
+    } else {
+      // Soft reboot — clear the crash effect and restart
+      setTimeout(() => {
+        chat.classList.remove('crash');
         rebootAI();
-      }
-    }, 1500);
-  }
+      }, 800); // wait a bit so the crash screen lingers
+    }
+  }, 1500);
+}
+
 
   // --- Reboot AI: Reset emotional state and memory, then send a reboot message ---
   function rebootAI() {
@@ -365,18 +372,18 @@ window.onload = function() {
   }
 
   // --- Utility: Play Typing Sound for each keystroke ---
-  function playTypingSound() {
-    const sound = typingSound.cloneNode();
-    sound.volume = 0.2;
-    sound.play();
-  }
+function playTypingSound() {
+  typingSound.currentTime = 0;
+  const p = typingSound.play();
+  if (p && p.catch) p.catch(err => console.error('Typing sound error:', err));
+}
 
   // --- Utility: Play Static Sound for flickers/crashes ---
   function playStaticSound() {
-    const sound = staticSound.cloneNode();
-    sound.volume = 0.3;
-    sound.play();
-  }
+  staticSound.currentTime = 0;
+  const p = staticSound.play();
+  if (p && p.catch) p.catch(err => console.error('Static sound error:', err));
+}
 
   // --- Utility: Simple delay function ---
   function delay(ms) {
