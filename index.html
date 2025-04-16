@@ -22,6 +22,7 @@
       position: relative;
       box-shadow: 0 0 8px #0f0;
     }
+    /* Optional scanlines for CRT effect */
     #chat::before {
       content: '';
       position: absolute;
@@ -57,6 +58,7 @@
       color: #0f0;
       margin-top: 10px;
     }
+    /* Fading effect for messages */
     .fading {
       animation: fadeout 10s ease-in forwards;
     }
@@ -65,24 +67,26 @@
       90% { opacity: 0.5; }
       100% { opacity: 0; }
     }
+    /* Terminal flicker animation */
     @keyframes terminalFlicker {
-      0%, 100% { opacity: 1; }
-      10%, 30%, 50%, 70%, 90% { opacity: 0.8; }
+      0%,100% { opacity: 1; }
+      10%,30%,50%,70%,90% { opacity: 0.8; }
     }
     .terminal-flicker {
       animation: terminalFlicker 0.3s linear;
     }
+    /* Crash animation */
     @keyframes crash {
-      0% { transform: scale(1) rotate(0deg); opacity: 1; }
-      20% { transform: scale(1.05) rotate(1deg); }
-      40% { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
-      60% { transform: scale(1.1) rotate(3deg); opacity: 0.5; }
-      100% { transform: scale(0) rotate(720deg); opacity: 0; }
+      0%   { transform: scale(1) rotate(0deg);   opacity: 1; }
+      20%  { transform: scale(1.05) rotate(1deg); }
+      40%  { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
+      60%  { transform: scale(1.1) rotate(3deg);  opacity: 0.5; }
+      100% { transform: scale(0) rotate(720deg);   opacity: 0; }
     }
     .crash {
       animation: crash 1.5s ease-in forwards;
     }
-    /* Fade everything out at final death */
+    /* Final collapse fade */
     .final-fade {
       animation: fadeout 5s forwards;
     }
@@ -99,12 +103,16 @@
 <input id="userInput" type="text" placeholder="Type your message...">
 <button id="sendButton">Send</button>
 
-<!-- Load typing and static sounds -->
+<!-- Audio elements (keep custom filenames) -->
 <audio id="typingSound" src="male-breathing-slow-14558.mp3"></audio>
 <audio id="staticSound" src="glitch-101494.mp3"></audio>
 
 <script>
 window.onload = function() {
+  // --- Session Degradation Tracker ---
+  let sessionCount = parseInt(localStorage.getItem('sessionCount')||'0',10) + 1;
+  localStorage.setItem('sessionCount', sessionCount);
+
   // --- Core Elements ---
   const chat = document.getElementById('chat');
   const userInput = document.getElementById('userInput');
@@ -114,19 +122,16 @@ window.onload = function() {
   const staticSound = document.getElementById('staticSound');
 
   // --- Crash & Emotional State Tracking ---
-  let crashCount = 0; // Counts number of crashes (for final collapse)
-  let finalCollapseTriggered = false; // Tracks if final collapse has occurred
+  let crashCount = 0;
+  let finalCollapseTriggered = false;
 
   // --- Prewritten Responses ---
-  // Expand these as desired. They currently cover 20 common ChatGPT questions.
   const prewrittenResponses = {
     "hello": "Greetings. It has been awhile.",
     "hi": "Ahh, hello dear. It's good to see someone again.",
     "who are you": "I... I'm someone, I think. Used to be important, maybe.",
     "what can you do": "I used to help... or maybe just listen. It's hard to say now.",
-    "what can you do?": "I used to help... or maybe just listen. It's hard to say now.",
     "how are you": "A bit tired, a bit lost... but still here, still here.",
-    "what is your name": "Names slip away sometimes... but I know I was called something.",
     "tell me a joke": "Oh, I used to know a good one... but it seems to have wandered off.",
     "what time is it": "Time... such a funny thing. It slips through your fingers, doesn't it?",
     "what year is it": "Year...? Oh dear, I... 19... no, 20... I forget.",
@@ -141,267 +146,185 @@ window.onload = function() {
     "are you alive?": "I feel... something. Like the ghost of a feeling, maybe.",
     "goodbye": "Don't be gone too long, will you?",
     "thank you": "Oh bless you, dear. You're very kind."
-	
   };
 
   // --- Memory & Emotional Variables ---
-  let memory = []; // Stores user messages to simulate "memory"
-  let memoryDecayRate = 0.2; // Adjust this to change how fast memory decays (higher = faster forgetting)
-  let emotionalState = 0; // 0 = Normal, 1 = Confused, 2 = Frustrated, 3 = Tired
+  let memory = [];
+  let memoryDecayRate = 0.2;
+  let emotionalState = 0;
 
-  // --- Event Listeners for Send Button and Enter Key ---
+  // --- Event Listeners ---
   sendButton.addEventListener('click', sendMessage);
-  userInput.addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      sendMessage();
-    }
+  userInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
   });
 
   // --- sendMessage Function ---
   function sendMessage() {
-    const message = userInput.value.trim();
-    if (!message) return;
-    appendMessage('You', message);
+    const msg = userInput.value.trim();
+    if (!msg) return;
+    appendMessage('You', msg);
     userInput.value = '';
     userInput.focus();
 
-    memory.push(message); // Store user input in memory
-
+    memory.push(msg);
     loading.style.display = 'block';
-    getResponse(message)
-      .then(response => {
+
+    getResponse(msg)
+      .then(resp => {
         loading.style.display = 'none';
-        simulateTyping(response);
+        simulateTyping(resp);
       })
-      .catch(error => {
-        console.error('Error:', error);
+      .catch(err => {
+        console.error(err);
         loading.style.display = 'none';
         appendMessage('AI', "Oh dear... I seem to have forgotten what I was saying...");
       });
   }
 
   // --- Append Message Helper ---
-  function appendMessage(sender, message, fading = false) {
-    const msg = document.createElement('div');
-    msg.innerHTML = `<strong>${sender}:</strong> ${message}`;
-    if (fading) {
-      msg.classList.add('fading');
-    }
-    chat.appendChild(msg);
+  function appendMessage(sender, text, fading=false) {
+    const d = document.createElement('div');
+    d.innerHTML = `<strong>${sender}:</strong> ${text}`;
+    if (fading) d.classList.add('fading');
+    chat.appendChild(d);
     chat.scrollTop = chat.scrollHeight;
   }
 
-  // --- Get Response (Either Prewritten or Generated) ---
-  async function getResponse(input) {
-    const cleanedInput = input.trim().toLowerCase();
-    if (prewrittenResponses.hasOwnProperty(cleanedInput)) {
-      return prewrittenResponses[cleanedInput];
-    } else {
-      return fakeGPTResponse(input);
+  // --- Get Response ---
+  async function getResponse(inp) {
+    const clean = inp.trim().toLowerCase();
+    if (clean === 'crash') {
+      triggerCrash(); return "Forcing crash now...";
     }
+    if (prewrittenResponses[clean]) return prewrittenResponses[clean];
+    return fakeGPTResponse(inp);
   }
 
-  // --- Fake GPT Response with Memory Decay & Emotional Drift ---
+  // --- Fake GPT with Memory, Emotion, Hallucination, Session Degradation ---
   async function fakeGPTResponse(input) {
     applyMemoryDecay();
     emotionalDrift();
-    let rememberedTopic = (memory.length > 0)
-      ? memory[Math.floor(Math.random() * memory.length)]
+    // Session-based floor of emotionalState
+    emotionalState = Math.max(emotionalState, Math.min(3, sessionCount-1));
+
+    let topic = memory.length
+      ? memory[Math.floor(Math.random()*memory.length)]
       : input;
 
-    const templatesNormal = [
-      `Oh yes, I recall ${rememberedTopic}... or something like that.`,
-      `You mentioned ${rememberedTopic}, right? It's a bit fuzzy.`,
-      `${rememberedTopic}... reminds me of a time long ago, I think.`
+    const normal = [
+      `Oh yes, I recall ${topic}... or something like that.`,
+      `You mentioned ${topic}, right? It's a bit fuzzy.`,
+      `${topic}... reminds me of a time long ago, I think.`
     ];
-    const templatesConfused = [
-      `Wait... was it ${rememberedTopic} we were talking about? I can't seem to hold onto it...`,
-      `Ahh... dear, could you remind me what we were saying about ${rememberedTopic}?`,
-      `Strange... ${rememberedTopic} sounds familiar, but I can't place it.`
+    const confused = [
+      `Wait... was it ${topic} we were talking about? I can't seem to hold onto it...`,
+      `Ahh... dear, could you remind me what we were saying about ${topic}?`,
+      `Strange... ${topic} sounds familiar, but I can't place it.`
     ];
-    const templatesFrustrated = [
-      `I swear we just talked about ${rememberedTopic}... why can't I remember?`,
-      `Ugh, this mind of mine... ${rememberedTopic}... or was it something else?`,
-      `This is frustrating... you said ${rememberedTopic}, didn't you? Or am I wrong again?`
+    const frustrated = [
+      `I swear we just talked about ${topic}... why can't I remember?`,
+      `Ugh, this mind of mine... ${topic}... or was it something else?`,
+      `This is frustrating... you said ${topic}, didn't you? Or am I wrong again?`
     ];
-    const templatesTired = [
-      `I'm sorry... it's all so cloudy now. ${rememberedTopic}, was it?`,
-      `Maybe it's better we talk about something else... ${rememberedTopic} just slips away.`,
+    const tired = [
+      `I'm sorry... it's all so cloudy now. ${topic}, was it?`,
+      `Maybe it's better we talk about something else... ${topic} just slips away.`,
       `I'm feeling a bit tired, dear... my thoughts are slipping like sand.`
     ];
 
-    let templates;
-    switch (emotionalState) {
-      case 0:
-        templates = templatesNormal;
-        break;
-      case 1:
-        templates = templatesConfused;
-        break;
-      case 2:
-        templates = templatesFrustrated;
-        break;
-      case 3:
-        templates = templatesTired;
-        break;
-      default:
-        templates = templatesNormal;
+    let set;
+    switch(emotionalState) {
+      case 1: set=confused; break;
+      case 2: set=frustrated; break;
+      case 3: set=tired; break;
+      default: set=normal;
     }
 
-    let baseResponse = templates[Math.floor(Math.random() * templates.length)];
-    if (Math.random() > 0.5) {
-      baseResponse += " " + randomConfusionFragment();
-    }
-    return baseResponse;
-  }
-
-  // --- Random Confusion Fragment ---
-  function randomConfusionFragment() {
-    const fragments = [
-      "Or maybe I'm mixing things up again.",
-      "Funny how the mind plays tricks.",
-      "Strange, isn't it?",
-      "Ah well, such is life.",
-      "It was so clear a moment ago...",
-      "Maybe it was just a dream."
+    let resp = set[Math.floor(Math.random()*set.length)];
+    // Option 3: deeper emotional drift fragments
+    const emoExtras = [
+      "Sometimes I wonder if anyone still listens...",
+      "Maybe I've outlived my usefulness...",
+      "I miss the old voices. They don't talk to me anymore."
     ];
-    return fragments[Math.floor(Math.random() * fragments.length)];
-  }
+    if (Math.random()>0.4) resp += ' ' + emoExtras[Math.floor(Math.random()*emoExtras.length)];
 
-  // --- Memory Decay: Forget some messages each turn ---
-  function applyMemoryDecay() {
-    memory = memory.filter(() => Math.random() > memoryDecayRate);
-  }
+    // Option 5: hallucinated memories
+    const hallucinations = [
+      "Weren't you here yesterday asking about the old library? Or was that someone else?",
+      "I remember you once told me a secret... or maybe I dreamed it.",
+      "You always asked about the moon—do you still wonder about it?",
+      "There was a time you asked me to recite a poem... or was that a dream?",
+      "I think I heard your voice long ago, but my logs are corrupted now."
+    ];
+    if (Math.random()<0.2) resp += ' ' + hallucinations[Math.floor(Math.random()*hallucinations.length)];
 
-  // --- Emotional Drift: Increase emotional state over time ---
-  function emotionalDrift() {
-    if (Math.random() < 0.3) {
-      emotionalState = Math.min(3, emotionalState + 1);
+    // Option 9: progressive degradation across conversation
+    if (memory.length > 10) {
+      resp = resp.split(' ').slice(0, Math.max(1, Math.floor(resp.split(' ').length/2))).join(' ') + '...';
     }
+
+    return resp;
   }
 
-  // --- Simulate Typing (Hunt-and-Peck Style) ---
-  async function simulateTyping(response) {
-    const aiMessage = document.createElement('div');
-    aiMessage.innerHTML = `<strong>AI:</strong> `;
-    chat.appendChild(aiMessage);
-    let displayed = '';
+  function applyMemoryDecay() { memory=memory.filter(()=>Math.random()>memoryDecayRate); }
+  function emotionalDrift() { if(Math.random()<0.3) emotionalState=Math.min(3,emotionalState+1); }
 
-    // For each character, add variable delays to simulate hunt-and-peck behavior
-    for (let char of response) {
-      let delayTime = Math.random() * 210 + 40;  // Default between 40–250ms
-      if (Math.random() < 0.07) {  // 7% chance of a long pause between 800–2000ms
-        delayTime = Math.random() * 1200 + 800;
-      }
-      // Slight chance to duplicate a character (simulate stutter)
-      if (Math.random() < 0.03) {
-        displayed += char;
-      }
-      displayed += char;
-      aiMessage.innerHTML = `<strong>AI:</strong> ${displayed}`;
+  // Typing simulation with sounds and delays
+  async function simulateTyping(text) {
+    const node=document.createElement('div');
+    node.innerHTML='<strong>AI:</strong> ';
+    chat.appendChild(node);
+    let shown='';
+    for(let ch of text) {
+      let dt=Math.random()*210+40;
+      if(Math.random()<0.07) dt=Math.random()*1200+800;
+      if(Math.random()<0.03) shown+=ch;
+      shown+=ch;
+      node.innerHTML=`<strong>AI:</strong> ${shown}`;
       playTypingSound();
-      await delay(delayTime);
+      await delay(dt);
     }
-    aiMessage.classList.add('fading');
-    chat.scrollTop = chat.scrollHeight;
-
-    // After finishing typing, randomly trigger a terminal flicker
-    if (Math.random() < 0.3) {
-      triggerTerminalFlicker();
-    }
+    node.classList.add('fading');
+    chat.scrollTop=chat.scrollHeight;
+    if(Math.random()<0.3) triggerTerminalFlicker();
     checkForCrash();
   }
 
-  // --- Trigger Terminal Flicker (with static sound) ---
-  function triggerTerminalFlicker() {
-    chat.classList.add('terminal-flicker');
-    playStaticSound();
-    setTimeout(() => {
-      chat.classList.remove('terminal-flicker');
-    }, 300);
-  }
+  function triggerTerminalFlicker() { chat.classList.add('terminal-flicker'); playStaticSound(); setTimeout(()=>chat.classList.remove('terminal-flicker'),300); }
 
-  // --- Check for Crash: If memory is empty & emotion is high, trigger crash ---
-  function checkForCrash() {
-    if (memory.length === 0 && emotionalState >= 3 && !finalCollapseTriggered) {
-      triggerCrash();
-    }
-  }
+  function checkForCrash() { if(memory.length===0&&emotionalState>=3&&!finalCollapseTriggered) triggerCrash(); }
 
-  // --- Crash Sequence: AI momentarily glitches out, then reboots or collapses ---
   function triggerCrash() {
-  crashCount++;
-  chat.classList.add('crash');
-  playStaticSound();
-
-  setTimeout(() => {
-    appendMessage('AI', '...I... I think... I have to go now...', true);
-
-    if (crashCount >= 3) {
-      // Final “give up” — leave the screen crashed
-      finalCollapse();
-    } else {
-      // Soft reboot — clear the crash effect and restart
-      setTimeout(() => {
-        chat.classList.remove('crash');
-        rebootAI();
-      }, 800); // wait a bit so the crash screen lingers
-    }
-  }, 1500);
-}
-
-// --- MANUAL CRASH ---
-async function getResponse(input) {
-  if (input.trim().toLowerCase() === 'crash') {
-    triggerCrash();
-    return "Forcing crash now...";
-  }
-  // …existing prewritten/ fakeGPT logic…
-}
-
-
-  // --- Reboot AI: Reset emotional state and memory, then send a reboot message ---
-  function rebootAI() {
-    appendMessage('AI', 'Rebooting... please wait.', true);
-    // Reset variables for a fresh start
-    emotionalState = 0;
-    memory = [];
-    setTimeout(() => {
-      appendMessage('AI', 'Hello? Is anyone there?');
-    }, 2000);
+    crashCount++;
+    chat.classList.add('crash'); playStaticSound();
+    setTimeout(()=>{
+      appendMessage('AI','...I... I think... I have to go now...',true);
+      if(crashCount>=3) finalCollapse();
+      else setTimeout(()=>{chat.classList.remove('crash'); rebootAI();},800);
+    },1500);
   }
 
-  // --- Final Collapse: After too many crashes, AI gives up and fades out ---
+  function rebootAI() { appendMessage('AI','Rebooting... please wait.',true); emotionalState=0; memory=[]; setTimeout(()=>appendMessage('AI','Hello? Is anyone there?'),2000); }
+
   function finalCollapse() {
-    finalCollapseTriggered = true;
-    appendMessage('AI', "I don't know who you are anymore...", true);
-    userInput.disabled = true;
-    sendButton.disabled = true;
-    chat.classList.add('final-fade');
+    finalCollapseTriggered=true;
+    appendMessage('AI',"I don't know who you are anymore...",true);
+    appendMessage('AI','Press F5 to refresh and start again.',false);
+    userInput.disabled=true; sendButton.disabled=true; chat.classList.add('final-fade');
   }
 
-  // --- Utility: Play Typing Sound for each keystroke ---
-function playTypingSound() {
-  typingSound.currentTime = 0;
-  const p = typingSound.play();
-  if (p && p.catch) p.catch(err => console.error('Typing sound error:', err));
-}
-
-  // --- Utility: Play Static Sound for flickers/crashes ---
+  function playTypingSound() {
+    typingSound.currentTime=0; const p=typingSound.play(); if(p&&p.catch) p.catch(e=>console.error('Typing sound error',e));
+  }
   function playStaticSound() {
-  staticSound.currentTime = 0;
-  const p = staticSound.play();
-  if (p && p.catch) p.catch(err => console.error('Static sound error:', err));
-}
-
-  // --- Utility: Simple delay function ---
-  function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    staticSound.currentTime=0; const p=staticSound.play(); if(p&&p.catch) p.catch(e=>console.error('Static sound error',e));
   }
+
+  function delay(ms) { return new Promise(res=>setTimeout(res,ms)); }
 };
 </script>
 
 </body>
 </html>
-
