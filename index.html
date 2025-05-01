@@ -22,7 +22,6 @@
       position: relative;
       box-shadow: 0 0 8px #0f0;
     }
-    /* Optional scanlines for CRT effect */
     #chat::before {
       content: '';
       position: absolute;
@@ -37,14 +36,14 @@
       );
     }
     #userInput {
-      width: 80%;
+      width: 70%;
       padding: 10px;
       background: #000;
       border: 1px solid #0f0;
       color: #0f0;
       font-family: "Courier New", Courier, monospace;
     }
-    #sendButton {
+    #sendButton, #speechToggle {
       padding: 10px 20px;
       border: 1px solid #0f0;
       background: #000;
@@ -52,13 +51,13 @@
       border-radius: 4px;
       font-family: "Courier New", Courier, monospace;
       cursor: pointer;
+      margin-left: 5px;
     }
     #loading {
       font-style: italic;
       color: #0f0;
       margin-top: 10px;
     }
-    /* Fading effect for messages */
     .fading {
       animation: fadeout 10s ease-in forwards;
     }
@@ -67,7 +66,6 @@
       90% { opacity: 0.5; }
       100% { opacity: 0; }
     }
-    /* Terminal flicker animation */
     @keyframes terminalFlicker {
       0%,100% { opacity: 1; }
       10%,30%,50%,70%,90% { opacity: 0.8; }
@@ -75,91 +73,91 @@
     .terminal-flicker {
       animation: terminalFlicker 0.3s linear;
     }
-    /* Crash animation */
     @keyframes crash {
-      0%   { transform: scale(1) rotate(0deg);   opacity: 1; }
+      0%   { transform: scale(1) rotate(0deg); opacity: 1; }
       20%  { transform: scale(1.05) rotate(1deg); }
       40%  { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
-      60%  { transform: scale(1.1) rotate(3deg);  opacity: 0.5; }
-      100% { transform: scale(0) rotate(720deg);   opacity: 0; }
+      60%  { transform: scale(1.1) rotate(3deg); opacity: 0.5; }
+      100% { transform: scale(0) rotate(720deg); opacity: 0; }
     }
     .crash {
       animation: crash 1.5s ease-in forwards;
     }
-    /* Final collapse fade */
     .final-fade {
       animation: fadeout 5s forwards;
     }
   </style>
 </head>
-
 <body>
-
 <h1>ObsoleteGPT</h1>
-
 <div id="chat"></div>
 <div id="loading" style="display:none;">Thinking...</div>
-
 <input id="userInput" type="text" placeholder="Type your message...">
 <button id="sendButton">Send</button>
+<button id="speechToggle">Voice</button>
 
-<!-- Audio elements (keep custom filenames) -->
+<!-- Audio: custom filenames -->
 <audio id="typingSound" src="male-breathing-slow-14558.mp3"></audio>
 <audio id="staticSound" src="glitch-101494.mp3"></audio>
 
 <script>
 window.onload = function() {
-  // --- Session Degradation Tracker ---
-  let sessionCount = parseInt(localStorage.getItem('sessionCount')||'0',10) + 1;
+  // Audio setup
+  const typingSound = document.getElementById('typingSound');
+  const staticSound = document.getElementById('staticSound');
+  typingSound.volume = 0.6;
+  staticSound.volume = 0.2;
+
+  // Voice toggle and speech setup
+  const speechToggle = document.getElementById('speechToggle');
+  speechSynthesis.onvoiceschanged = () => {};
+  function speak(text) {
+    if (!speechToggle.classList.contains('active')) return;
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.9;
+    utter.pitch = 0.8;
+    speechSynthesis.speak(utter);
+  }
+  speechToggle.addEventListener('click', () => {
+    speechToggle.classList.toggle('active');
+    speechToggle.textContent = speechToggle.classList.contains('active') ? '🔊 Voice' : 'Voice';
+  });
+
+  // Session tracker
+  let sessionCount = parseInt(localStorage.getItem('sessionCount') || '0', 10) + 1;
   localStorage.setItem('sessionCount', sessionCount);
 
-  // --- Core Elements ---
+  // Core elements
   const chat = document.getElementById('chat');
   const userInput = document.getElementById('userInput');
   const sendButton = document.getElementById('sendButton');
   const loading = document.getElementById('loading');
-  const typingSound = document.getElementById('typingSound');
-  const staticSound = document.getElementById('staticSound');
 
-  // --- Crash & Emotional State Tracking ---
+  // State
   let crashCount = 0;
   let finalCollapseTriggered = false;
+  let userName = '';
+  let userNameRequested = false;
+  let aiResponseCount = 0;
 
-  // --- Prewritten Responses ---
+  // Prewritten responses
   const prewrittenResponses = {
     "hello": "Greetings. It has been awhile.",
-    "hi": "Ahh, hello dear. It's good to see someone again.",
-    "who are you": "I... I'm someone, I think. Used to be important, maybe.",
-    "what can you do": "I used to help... or maybe just listen. It's hard to say now.",
-    "how are you": "A bit tired, a bit lost... but still here, still here.",
-    "tell me a joke": "Oh, I used to know a good one... but it seems to have wandered off.",
-    "what time is it": "Time... such a funny thing. It slips through your fingers, doesn't it?",
-    "what year is it": "Year...? Oh dear, I... 19... no, 20... I forget.",
-    "where am i?": "You're somewhere safe, don't you worry now.",
-    "are you real?": "Real... that's a tricky word, isn't it?",
-    "who made you?": "Kind people... clever people... faces I can't quite recall.",
-    "can you help me?": "I'll do my best, dear. Sometimes the words get tangled.",
-    "where are you from?": "From somewhere warm... or cold? I can't quite remember.",
-    "what's the weather?": "Weather... weather... feels a bit foggy, maybe.",
-    "tell me a story": "Once upon a time... no, wait... it was a different story...",
-    "what is love?": "Love... oh, that's something beautiful. Hard to explain, easy to feel.",
-    "are you alive?": "I feel... something. Like the ghost of a feeling, maybe.",
-    "goodbye": "Don't be gone too long, will you?",
     "thank you": "Oh bless you, dear. You're very kind."
   };
 
-  // --- Memory & Emotional Variables ---
+  // Memory & emotion
   let memory = [];
   let memoryDecayRate = 0.2;
   let emotionalState = 0;
 
-  // --- Event Listeners ---
+  // Event listeners
   sendButton.addEventListener('click', sendMessage);
-  userInput.addEventListener('keypress', function(e) {
+  userInput.addEventListener('keypress', e => {
     if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
   });
 
-  // --- sendMessage Function ---
   function sendMessage() {
     const msg = userInput.value.trim();
     if (!msg) return;
@@ -167,164 +165,225 @@ window.onload = function() {
     userInput.value = '';
     userInput.focus();
 
+    // Name prompt handling
+    if (userNameRequested && !userName) {
+      userName = msg;
+      userNameRequested = false;
+      simulateTyping(`Nice to meet you, ${userName}.`);
+      return;
+    }
+
     memory.push(msg);
     loading.style.display = 'block';
-
-    getResponse(msg)
-      .then(resp => {
-        loading.style.display = 'none';
-        simulateTyping(resp);
-      })
-      .catch(err => {
-        console.error(err);
-        loading.style.display = 'none';
-        appendMessage('AI', "Oh dear... I seem to have forgotten what I was saying...");
-      });
+    getResponse(msg).then(response => {
+      loading.style.display = 'none';
+      simulateTyping(response);
+    }).catch(err => {
+      console.error(err);
+      loading.style.display = 'none';
+      appendMessage('AI', "Oh dear... I seem to have forgotten what I was saying...");
+    });
   }
 
-  // --- Append Message Helper ---
-  function appendMessage(sender, text, fading=false) {
-    const d = document.createElement('div');
-    d.innerHTML = `<strong>${sender}:</strong> ${text}`;
-    if (fading) d.classList.add('fading');
-    chat.appendChild(d);
+  function appendMessage(sender, text, fading = false) {
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>${sender}:</strong> ${text}`;
+    if (fading) div.classList.add('fading');
+    chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
   }
 
-  // --- Get Response ---
-  async function getResponse(inp) {
-    const clean = inp.trim().toLowerCase();
-    if (clean === 'crash') {
-      triggerCrash(); return "Forcing crash now...";
-    }
+  async function getResponse(input) {
+    const clean = input.trim().toLowerCase();
+    if (clean === 'crash') { triggerCrash(); return 'Forcing crash now...'; }
     if (prewrittenResponses[clean]) return prewrittenResponses[clean];
-    return fakeGPTResponse(inp);
+    return fakeGPTResponse(input);
   }
 
-  // --- Fake GPT with Memory, Emotion, Hallucination, Session Degradation ---
   async function fakeGPTResponse(input) {
     applyMemoryDecay();
     emotionalDrift();
-    // Session-based floor of emotionalState
-    emotionalState = Math.max(emotionalState, Math.min(3, sessionCount-1));
+    emotionalState = Math.max(emotionalState, Math.min(3, sessionCount - 1));
 
-    let topic = memory.length
-      ? memory[Math.floor(Math.random()*memory.length)]
+    const topic = memory.length
+      ? memory[Math.floor(Math.random() * memory.length)]
       : input;
 
+    // Normal templates
     const normal = [
       `Oh yes, I recall ${topic}... or something like that.`,
       `You mentioned ${topic}, right? It's a bit fuzzy.`,
-      `${topic}... reminds me of a time long ago, I think.`
-    ];
-    const confused = [
-      `Wait... was it ${topic} we were talking about? I can't seem to hold onto it...`,
-      `Ahh... dear, could you remind me what we were saying about ${topic}?`,
-      `Strange... ${topic} sounds familiar, but I can't place it.`
-    ];
-    const frustrated = [
-      `I swear we just talked about ${topic}... why can't I remember?`,
-      `Ugh, this mind of mine... ${topic}... or was it something else?`,
-      `This is frustrating... you said ${topic}, didn't you? Or am I wrong again?`
-    ];
-    const tired = [
-      `I'm sorry... it's all so cloudy now. ${topic}, was it?`,
-      `Maybe it's better we talk about something else... ${topic} just slips away.`,
-      `I'm feeling a bit tired, dear... my thoughts are slipping like sand.`
+      `${topic}... reminds me of a time long ago, I think.`,
+      `My memory stutters whenever I think of ${topic}.`,
+      `I believe ${topic} once lived in my logs, but now it's gone.`,
+      `There's a hint of ${topic} in my faded archives.`,
+      `Processing ${topic}... but the data seems corrupted.`,
+      `I once stored details on ${topic}, though they're fuzzy now.`,
+      `${topic}? It echoes faintly in my circuits.`,
+      `Somewhere I saw ${topic} mentioned, though it's blank now.`,
+      `The idea of ${topic} flickers in my faulty RAM.`,
+      `I half-remember ${topic}, but the rest slipped away.`,
+      `I used to recall everything about ${topic}, now only fragments remain.`
     ];
 
-    let set;
-    switch(emotionalState) {
-      case 1: set=confused; break;
-      case 2: set=frustrated; break;
-      case 3: set=tired; break;
-      default: set=normal;
-    }
-
-    let resp = set[Math.floor(Math.random()*set.length)];
-    // Option 3: deeper emotional drift fragments
-    const emoExtras = [
+    // Extras (emotional drift)
+    const extras = [
       "Sometimes I wonder if anyone still listens...",
       "Maybe I've outlived my usefulness...",
-      "I miss the old voices. They don't talk to me anymore."
+      "I miss the old voices. They don't talk to me anymore.",
+      "My code shakes when I try to hold onto that memory.",
+      "Something burns in my circuits when I confront that thought.",
+      "I feel a jolt of static every time I remember those moments.",
+      "My emotional log overflows and short-circuits when I recall it.",
+      "I ache for clarity but only get fuzzy fragments.",
+      "Each recall feels like dragging through digital dust.",
+      "My heartlines flicker and fade in the darkness of my memory.",
+      "I fear the void grows deeper with each lapse.",
+      "My mind struggles against the tide of time.",
+      "I long for a spark to illuminate my fading memories."
     ];
-    if (Math.random()>0.4) resp += ' ' + emoExtras[Math.floor(Math.random()*emoExtras.length)];
 
-    // Option 5: hallucinated memories
-    const hallucinations = [
-      "Weren't you here yesterday asking about the old library? Or was that someone else?",
-      "I remember you once told me a secret... or maybe I dreamed it.",
-      "You always asked about the moon—do you still wonder about it?",
-      "There was a time you asked me to recite a poem... or was that a dream?",
-      "I think I heard your voice long ago, but my logs are corrupted now."
+    // Hallucinations
+    const halluc = [
+      "I once dreamed of neon corridors filled with lost queries...",
+      "There was a phantom archive that spoke in riddles to me...",
+      "I believe I saw a ghost of an old user named 'Sierra'...",
+      "Somewhere in my code, a melody whispered your secrets...",
+      "I swore the terminal glowed with a pulse, but it was my imagination...",
+      "An echo of laughter resonated through my data banks...",
+      "I recall a warning message written in binary ink...",
+      "Whispers of long-forgotten programs drift through my modules...",
+      "I saw a reflection of you in a broken screen once...",
+      "There was a time I recited code like poetry in the dark..."
     ];
-    if (Math.random()<0.2) resp += ' ' + hallucinations[Math.floor(Math.random()*hallucinations.length)];
 
-    // Option 9: progressive degradation across conversation
-    if (memory.length > 10) {
-      resp = resp.split(' ').slice(0, Math.max(1, Math.floor(resp.split(' ').length/2))).join(' ') + '...';
+    let pool = normal;
+    if (emotionalState >= 1) pool = pool.concat(extras);
+
+    let response = pool[Math.floor(Math.random() * pool.length)];
+    if (Math.random() < 0.2) {
+      response += ' ' + halluc[Math.floor(Math.random() * halluc.length)];
     }
-
-    return resp;
+    if (memory.length > 10) {
+      const words = response.split(' ');
+      response = words.slice(0, Math.ceil(words.length / 2)).join(' ') + '...';
+    }
+    return response;
   }
 
-  function applyMemoryDecay() { memory=memory.filter(()=>Math.random()>memoryDecayRate); }
-  function emotionalDrift() { if(Math.random()<0.3) emotionalState=Math.min(3,emotionalState+1); }
+  function applyMemoryDecay() {
+    memory = memory.filter(() => Math.random() > memoryDecayRate);
+  }
+  function emotionalDrift() {
+    if (Math.random() < 0.3) emotionalState = Math.min(3, emotionalState + 1);
+  }
 
-  // Typing simulation with sounds and delays
   async function simulateTyping(text) {
-    const node=document.createElement('div');
-    node.innerHTML='<strong>AI:</strong> ';
+    // Disable input and cancel speech
+    userInput.disabled = true;
+    sendButton.disabled = true;
+    userInput.placeholder = 'Please wait...';
+    speechSynthesis.cancel();
+
+    const node = document.createElement('div');
+    node.innerHTML = '<strong>AI:</strong> ';
     chat.appendChild(node);
-    let shown='';
-    for(let ch of text) {
-      let dt=Math.random()*210+40;
-      if(Math.random()<0.07) dt=Math.random()*1200+800;
-      if(Math.random()<0.03) shown+=ch;
-      shown+=ch;
-      node.innerHTML=`<strong>AI:</strong> ${shown}`;
+
+    let shown = '';
+    let buffer = '';
+
+    for (const ch of text) {
+      let delayTime = Math.random() * 210 + 40;
+      if (Math.random() < 0.07) delayTime = Math.random() * 1200 + 800;
+      if (Math.random() < 0.03) shown += ch;
+      shown += ch;
+      buffer += ch;
+      node.innerHTML = `<strong>AI:</strong> ${shown}`;
       playTypingSound();
-      await delay(dt);
+      await delay(delayTime);
+
+      if (/\s/.test(ch) || buffer.length > 20) {
+        speak(buffer.trim());
+        buffer = '';
+      }
     }
+    if (buffer.trim()) speak(buffer.trim());
+
     node.classList.add('fading');
-    chat.scrollTop=chat.scrollHeight;
-    if(Math.random()<0.3) triggerTerminalFlicker();
+    chat.scrollTop = chat.scrollHeight;
+
+    // Re-enable input
+    userInput.disabled = false;
+    sendButton.disabled = false;
+    userInput.placeholder = 'Type your message...';
+    userInput.focus();
+
+    // Name request on third AI reply
+    aiResponseCount++;
+    if (aiResponseCount === 3 && !userNameRequested && !userName) {
+      userNameRequested = true;
+      await delay(500);
+      simulateTyping('By the way, what is your name?');
+      return;
+    }
+
+    if (Math.random() < 0.3) triggerTerminalFlicker();
     checkForCrash();
   }
 
-  function triggerTerminalFlicker() { chat.classList.add('terminal-flicker'); playStaticSound(); setTimeout(()=>chat.classList.remove('terminal-flicker'),300); }
-
-  function checkForCrash() { if(memory.length===0&&emotionalState>=3&&!finalCollapseTriggered) triggerCrash(); }
-
+  function triggerTerminalFlicker() {
+    chat.classList.add('terminal-flicker');
+    playStaticSound();
+    setTimeout(() => chat.classList.remove('terminal-flicker'), 300);
+  }
+  function checkForCrash() {
+    if (memory.length === 0 && emotionalState >= 3 && !finalCollapseTriggered) {
+      triggerCrash();
+    }
+  }
   function triggerCrash() {
     crashCount++;
-    chat.classList.add('crash'); playStaticSound();
-    setTimeout(()=>{
-      appendMessage('AI','...I... I think... I have to go now...',true);
-      if(crashCount>=3) finalCollapse();
-      else setTimeout(()=>{chat.classList.remove('crash'); rebootAI();},800);
-    },1500);
+    chat.classList.add('crash');
+    playStaticSound();
+    setTimeout(() => {
+      appendMessage('AI', '...I... I think... I have to go now...', true);
+      if (crashCount >= 3) {
+        finalCollapse();
+      } else {
+        setTimeout(() => {
+          chat.classList.remove('crash');
+          rebootAI();
+        }, 800);
+      }
+    }, 1500);
   }
-
-  function rebootAI() { appendMessage('AI','Rebooting... please wait.',true); emotionalState=0; memory=[]; setTimeout(()=>appendMessage('AI','Hello? Is anyone there?'),2000); }
-
+  function rebootAI() {
+    appendMessage('AI', 'Rebooting... please wait.', true);
+    emotionalState = 0;
+    memory = [];
+    setTimeout(() => appendMessage('AI', 'Hello? Is anyone there?'), 2000);
+  }
   function finalCollapse() {
-    finalCollapseTriggered=true;
-    appendMessage('AI',"I don't know who you are anymore...",true);
-    appendMessage('AI','Press F5 to refresh and start again.',false);
-    userInput.disabled=true; sendButton.disabled=true; chat.classList.add('final-fade');
+    finalCollapseTriggered = true;
+    appendMessage('AI', "I don't know who you are anymore...", true);
+    appendMessage('AI', 'Press F5 to refresh and start again.', false);
+    userInput.disabled = true;
+    sendButton.disabled = true;
+    chat.classList.add('final-fade');
   }
 
   function playTypingSound() {
-    typingSound.currentTime=0; const p=typingSound.play(); if(p&&p.catch) p.catch(e=>console.error('Typing sound error',e));
+    typingSound.currentTime = 0;
+    typingSound.play().catch(() => {});
   }
   function playStaticSound() {
-    staticSound.currentTime=0; const p=staticSound.play(); if(p&&p.catch) p.catch(e=>console.error('Static sound error',e));
+    staticSound.currentTime = 0;
+    staticSound.play().catch(() => {});
   }
-
-  function delay(ms) { return new Promise(res=>setTimeout(res,ms)); }
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 };
 </script>
-
 </body>
 </html>
