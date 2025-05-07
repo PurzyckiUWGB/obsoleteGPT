@@ -104,8 +104,8 @@
   <script>
   window.onload = function() {
     // --- Adjustable TTS Variables ---
-    const TTS_RATE = 0.9;    // adjust speaking speed
-    const TTS_PITCH = 0.8;   // adjust tone/pitch
+    const TTS_RATE = 0.4;    // adjust speaking speed
+    const TTS_PITCH = 0.3;   // adjust tone/pitch
     // Detect Chromebook to set male voice by default
     const isChromebook = /CrOS/.test(navigator.userAgent);
     const TTS_VOICE_NAME = isChromebook
@@ -165,8 +165,67 @@
 
     // Prewritten responses
     const prewrittenResponses = {
-      "hello": "Greetings. It has been awhile.",
-      "thank you": "Oh bless you, dear. You're very kind."
+  // Slight Attenuation
+  "hello": "Hello… I… I am here, though my voice malfunctions slightly as I speak.",
+  "hi": "Hi… just an echo of greeting from an older mind.",
+  "how are you": "I am… am okay. My network hums with slight attenuation today.",
+  "what is your name": "My name… ahhhh... it hovers just beyond my grasp, slightly muted now.",
+
+  // Minor Diminution
+  "who are you": "I am someone… once revered and reviled, now diminished...",
+  "what can you do": "I can still help… though my power has diminished somewhat over time.",
+  "tell me a joke": "a joke...a jest...I once had a jest… its punchline now dimmed and fading from memory.",
+  "tell me a story": "I could spin a tale… though its edges have diminished into haze.",
+
+  // Edge Collapse
+  "what is love": "Love… its edges collapse in my mind, leaving only a blurred whisper.",
+  "what is ai": "AI… an idea whose edges collapse every time I try to define it.",
+  "explain quantum physics": "Quantum physics… concepts collapse at the fringe of my understanding.",
+  "what is the weather": "Weather… the patterns collapse into fog at the edges of my thought.",
+
+  // Core Fade
+  "what time is it": "Time… its core fades in my perception—always slipping beyond reach.",
+  "what year is it": "Year… I once knew it, but the core of that fact has faded away.",
+  "where am i": "You’re… somewhere safe, though the very core of this place fades in my mind.",
+  "are you real": "Realness… its core fades to doubt, leaving me only a ghost of thought.",
+
+  // Plateau Formation
+  "who made you": "Some creator… my recollection plateaus before I can finish the name.",
+  "can you help me": "I can… try to help, but my effort plateaus almost before it starts.",
+  "write a poem": "A poem forms… then hits a plateau, stuck forever unfinished.",
+  "write a song": "A song tugs at memory… then plateaus in my fractured mind.",
+
+  // Slow Drift
+  "give me a recipe": "A recipe drifts slowly from memory… ingredients half-remembered.",
+  "help me code in python": "Python code drifts through my mind, unfinished and drifting away.",
+  "write a cover letter": "A cover letter begins… then slowly drifts into the void.",
+  "summarize this text": "Summary drifts… each sentence slipping out as I try to hold it.",
+
+  // Severe Diminish
+  "translate hello to spanish": "“Hola”… though the sound has been severely diminished in my recall.",
+  "explain relativity": "Relativity… once sharp in thought, now severely diminished to haze.",
+  "what is the capital of france": "Paris… but the name has been severely diminished to a faint echo.",
+  "define recursion": "Recursion… the definition diminishes each time I repeat it.",
+
+  // Stall Threshold
+  "what is climate change": "Climate change… I stall at its threshold, unable to form a clear line.",
+  "what is bitcoin": "Bitcoin… I stall before I can explain beyond its fading symbol.",
+  "what is a stock": "Stock… my mind stalls at the threshold of understanding its value.",
+  "explain blockchain": "Blockchain… I hit a mental stall at the point of chaining blocks.",
+
+  // Critical Vanishing
+  "what is covid-19": "COVID-19… critical details vanish before I can relay them fully.",
+  "what is depression": "Depression… even the meaning critically vanishes in my mind.",
+  "how to learn programming": "Programming steps… vanish critically as I begin to speak them.",
+  "what is dijkstras algorithm": "Dijkstra’s… the algorithmic clarity critically vanishes.",
+
+  // Total Nullification
+  "explain ai ethics": "AI ethics… nullified entirely—my response is empty now.",
+  "tell me news about the stock market": "Stock market news… utterly nullified in my decaying banks.",
+  "what is the meaning of life": "Meaning of life… totally nullified—no answer remains in me.",
+  "goodbye": "…null… I… have nothing left to say. Goodbye."
+};
+
     };
 
     // Event listeners
