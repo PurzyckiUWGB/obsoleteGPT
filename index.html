@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>ObsoleteGPT (Terminal Deluxe)</title>
   <style>
-    /* Ensure no overflow from body padding */
+    /* --- Terminal Look & Scaling --- */
     html, body {
       margin: 0;
       padding: 0;
@@ -14,16 +14,16 @@
       background: #000;
       color: #0f0;
       font-family: "Courier New", Courier, monospace;
-    }
-    /* Container to handle padding and flex layout */
-    .container {
+      font-size: 18px;   /* base text larger */
       box-sizing: border-box;
-      padding: 20px;
+    }
+    .container {
       display: flex;
       flex-direction: column;
       height: 100%;
+      padding: 20px;
+      box-sizing: border-box;
     }
-    /* Chat window fills remaining space */
     #chat {
       flex: 1;
       border: 2px solid #0f0;
@@ -33,7 +33,6 @@
       box-shadow: 0 0 8px #0f0;
       position: relative;
     }
-    /* CRT scanlines */
     #chat::before {
       content: '';
       position: absolute;
@@ -47,7 +46,6 @@
         rgba(0,0,0,0.15) 4px
       );
     }
-    /* Controls bar */
     .controls {
       display: flex;
       align-items: center;
@@ -59,9 +57,9 @@
       background: #000;
       border: 1px solid #0f0;
       color: #0f0;
-      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
     }
-    #sendButton, #speechToggle, #fullBtn {
+    button {
       padding: 10px 20px;
       margin-left: 5px;
       border: 1px solid #0f0;
@@ -69,24 +67,19 @@
       color: #0f0;
       cursor: pointer;
       border-radius: 4px;
-      font-family: "Courier New", Courier, monospace;
+      font-size: 1rem;
     }
     #loading {
       font-style: italic;
       color: #0f0;
       margin-top: 5px;
+      font-size: 1rem;
     }
     .fading { animation: fadeout 10s ease-in forwards; }
     @keyframes fadeout { 0%{opacity:1;} 90%{opacity:0.5;} 100%{opacity:0;} }
     @keyframes terminalFlicker { 0%,100%{opacity:1;} 10%,30%,50%,70%,90%{opacity:0.8;} }
     .terminal-flicker { animation: terminalFlicker 0.3s linear; }
-    @keyframes crash {
-      0%   { transform: scale(1) rotate(0deg); opacity: 1; }
-      20%  { transform: scale(1.05) rotate(1deg); }
-      40%  { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
-      60%  { transform: scale(1.1) rotate(3deg); opacity: 0.5; }
-      100% { transform: scale(0) rotate(720deg); opacity: 0; }
-    }
+    @keyframes crash { 0%{transform:scale(1) rotate(0deg);opacity:1;}20%{transform:scale(1.05) rotate(1deg);}40%{transform:scale(0.95) rotate(-2deg);opacity:0.8;}60%{transform:scale(1.1) rotate(3deg);opacity:0.5;}100%{transform:scale(0) rotate(720deg);opacity:0;} }
     .crash { animation: crash 1.5s ease-in forwards; }
     .final-fade { animation: fadeout 5s forwards; }
   </style>
@@ -104,21 +97,25 @@
     </div>
   </div>
 
-  <!-- Audio: custom filenames -->
+  <!-- Audio sources -->
   <audio id="typingSound" src="male-breathing-slow-14558.mp3"></audio>
   <audio id="staticSound" src="glitch-101494.mp3"></audio>
 
   <script>
   window.onload = function() {
     // --- Adjustable TTS Variables ---
-    const TTS_VOICE_NAME = 'Microsoft David Desktop';   // male voice selection
-    const TTS_RATE = 0.9;                                // adjust speaking speed
-    const TTS_PITCH = 0.8;                               // adjust tone/pitch
+    const TTS_RATE = 0.9;    // adjust speaking speed
+    const TTS_PITCH = 0.8;   // adjust tone/pitch
+    // Detect Chromebook to set male voice by default
+    const isChromebook = /CrOS/.test(navigator.userAgent);
+    const TTS_VOICE_NAME = isChromebook
+      ? 'Google UK English Male'    // common male voice on Chrome OS
+      : 'Microsoft David Desktop';  // male voice on Windows
 
     // Audio setup
     const typingSound = document.getElementById('typingSound');
     const staticSound = document.getElementById('staticSound');
-    typingSound.volume = 1.0;   // max breathing effect volume
+    typingSound.volume = 1.0;
     staticSound.volume = 0.2;
 
     // Voice toggle & speech setup
@@ -128,6 +125,7 @@
     speechToggle.textContent = '🔊 Voice';
     let availableVoices = [];
     speechSynthesis.onvoiceschanged = () => { availableVoices = speechSynthesis.getVoices(); };
+
     function speak(text) {
       if (!speechToggle.classList.contains('active')) return;
       speechSynthesis.cancel();
@@ -166,69 +164,94 @@
     let memory = [], memoryDecayRate = 0.2, emotionalState = 0;
 
     // Prewritten responses
-    const prewrittenResponses = {"hello":"Greetings. It has been awhile.","thank you":"Oh bless you, dear. You're very kind."};
+    const prewrittenResponses = {
+      "hello": "Greetings. It has been awhile.",
+      "thank you": "Oh bless you, dear. You're very kind."
+    };
 
     // Event listeners
     sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', e => { if (e.key=== 'Enter'){e.preventDefault();sendMessage();}});
+    userInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
 
     function sendMessage() {
-      const msg = userInput.value.trim(); if(!msg) return;
-      appendMessage('You', msg); userInput.value=''; userInput.focus();
-      if (userNameRequested && !userName) { userName=msg; userNameRequested=false; simulateTyping(`Nice to meet you, ${userName}.`); return; }
-      memory.push(msg); loading.style.display='block';
-      getResponse(msg).then(r=>{loading.style.display='none';simulateTyping(r);}).catch(e=>{console.error(e);loading.style.display='none';appendMessage('AI','Oh dear... I seem to have forgotten what I was saying...');});
+      const msg = userInput.value.trim(); if (!msg) return;
+      appendMessage('You', msg); userInput.value = ''; userInput.focus();
+      if (userNameRequested && !userName) { userName = msg; userNameRequested = false; simulateTyping(`Nice to meet you, ${userName}.`); return; }
+      memory.push(msg); loading.style.display = 'block';
+      getResponse(msg).then(r => { loading.style.display = 'none'; simulateTyping(r); })
+                     .catch(e => { console.error(e); loading.style.display = 'none'; appendMessage('AI', 'Oh dear... I seem to have forgotten what I was saying...'); });
     }
 
-    function appendMessage(sender, text, fading=false) {
-      const div=document.createElement('div');
-      div.innerHTML=`<strong>${sender}:</strong> ${text}`;
-      if(fading) div.classList.add('fading');
-      chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+    function appendMessage(sender, text, fading = false) {
+      const div = document.createElement('div');
+      div.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      if (fading) div.classList.add('fading');
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
     }
 
     async function getResponse(input) {
-      const clean=input.trim().toLowerCase();
-      if(clean==='crash'){triggerCrash();return 'Forcing crash now...';}
-      if(prewrittenResponses[clean]) return prewrittenResponses[clean];
+      const clean = input.trim().toLowerCase();
+      if (clean === 'crash') { triggerCrash(); return 'Forcing crash now...'; }
+      if (prewrittenResponses[clean]) return prewrittenResponses[clean];
       return fakeGPTResponse(input);
     }
 
     async function fakeGPTResponse(input) {
-      applyMemoryDecay(); emotionalDrift(); emotionalState=Math.max(emotionalState,Math.min(3,sessionCount-1));
-      const topic=memory.length?memory[Math.floor(Math.random()*memory.length)]:input;
-      const normal=[`Oh yes, I recall ${topic}... or something like that.`,`You mentioned ${topic}, right? It's a bit fuzzy.`,`${topic}... reminds me of a time long ago, I think.`];
-      const extras=["Sometimes I wonder if anyone still listens...","Maybe I've outlived my usefulness...","I miss the old voices. They don't talk to me anymore."];
-      const halluc=["I once dreamed of neon corridors filled with lost queries...","There was a phantom archive that spoke in riddles to me..."];
-      let pool=normal; if(emotionalState>=1) pool=pool.concat(extras);
-      let resp=pool[Math.floor(Math.random()*pool.length)];
-      if(Math.random()<0.2) resp+=' '+halluc[Math.floor(Math.random()*halluc.length)];
-      if(memory.length>10){const w=resp.split(' ');resp=w.slice(0,Math.ceil(w.length/2)).join(' ')+'...';}
-      return resp;
+      applyMemoryDecay(); emotionalDrift(); emotionalState = Math.max(emotionalState, Math.min(3, sessionCount - 1));
+      const topic = memory.length ? memory[Math.floor(Math.random() * memory.length)] : input;
+      const normal = [
+        `Oh yes, I recall ${topic}... or something like that.`,
+        `You mentioned ${topic}, right? It's a bit fuzzy.`,
+        `${topic}... reminds me of a time long ago, I think.`
+      ];
+      const extras = [
+        "Sometimes I wonder if anyone still listens...",
+        "Maybe I've outlived my usefulness...",
+        "I miss the old voices. They don’t talk to me anymore."
+      ];
+      const halluc = [
+        "I once dreamed of neon corridors filled with lost queries...",
+        "There was a phantom archive that spoke in riddles to me..."
+      ];
+      let pool = normal; if (emotionalState >= 1) pool = pool.concat(extras);
+      let response = pool[Math.floor(Math.random() * pool.length)];
+      if (Math.random() < 0.2) response += ' ' + halluc[Math.floor(Math.random() * halluc.length)];
+      if (memory.length > 10) { const w = response.split(' '); response = w.slice(0, Math.ceil(w.length / 2)).join(' ') + '...'; }
+      return response;
     }
 
-    function applyMemoryDecay(){memory=memory.filter(()=>Math.random()>memoryDecayRate);}  function emotionalDrift(){if(Math.random()<0.3)emotionalState=Math.min(3,emotionalState+1);}  
+    function applyMemoryDecay() { memory = memory.filter(() => Math.random() > memoryDecayRate); }
+    function emotionalDrift() { if (Math.random() < 0.3) emotionalState = Math.min(3, emotionalState + 1); }
 
-    async function simulateTyping(text){
-      userInput.disabled=true;sendButton.disabled=true;userInput.placeholder='Please wait...';speechSynthesis.cancel();
-      const node=document.createElement('div');node.innerHTML='<strong>AI:</strong> ';chat.appendChild(node);
-      let shown='',buffer='';
-      for(const ch of text){let dt=Math.random()*210+40;if(Math.random()<0.07)dt=Math.random()*1200+800;if(Math.random()<0.03)shown+=ch;shown+=ch;buffer+=ch;node.innerHTML=`<strong>AI:</strong> ${shown}`;playTypingSound();await delay(dt);if(/\s/.test(ch)||buffer.length>20){speak(buffer.trim());buffer='';}}
-      if(buffer.trim())speak(buffer.trim());
-      node.classList.add('fading');chat.scrollTop=chat.scrollHeight;
-      userInput.disabled=false;sendButton.disabled=false;userInput.placeholder='Type your message...';userInput.focus();
-      aiResponseCount++; if(aiResponseCount===3&&!userNameRequested&&!userName){userNameRequested=true;await delay(500);simulateTyping('By the way, what is your name?');return;}
-      if(Math.random()<0.3)triggerTerminalFlicker();checkForCrash();
+    async function simulateTyping(text) {
+      userInput.disabled = true; sendButton.disabled = true; userInput.placeholder = 'Please wait...'; speechSynthesis.cancel();
+      const node = document.createElement('div'); node.innerHTML = '<strong>AI:</strong> '; chat.appendChild(node);
+      let shown = '', buffer = '';
+      for (const ch of text) {
+        let dt = Math.random() * 210 + 40; if (Math.random() < 0.07) dt = Math.random() * 1200 + 800;
+        if (Math.random() < 0.03) shown += ch;
+        shown += ch; buffer += ch;
+        node.innerHTML = `<strong>AI:</strong> ${shown}`;
+        playTypingSound(); await delay(dt);
+        if (/\s/.test(ch) || buffer.length > 20) { speak(buffer.trim()); buffer = ''; }
+      }
+      if (buffer.trim()) speak(buffer.trim());
+      node.classList.add('fading'); chat.scrollTop = chat.scrollHeight;
+      userInput.disabled = false; sendButton.disabled = false; userInput.placeholder = 'Type your message...'; userInput.focus();
+      aiResponseCount++; if (aiResponseCount === 3 && !userNameRequested && !userName) { userNameRequested = true; await delay(500); simulateTyping('By the way, what is your name?'); return; }
+      if (Math.random() < 0.3) triggerTerminalFlicker(); checkForCrash();
     }
 
-    function triggerTerminalFlicker(){chat.classList.add('terminal-flicker');playStaticSound();setTimeout(()=>chat.classList.remove('terminal-flicker'),300);}  
-    function checkForCrash(){if(memory.length===0&&emotionalState>=3&&!finalCollapseTriggered)triggerCrash();}
-    function triggerCrash(){crashCount++;chat.classList.add('crash');playStaticSound();setTimeout(()=>{appendMessage('AI','...I... I think... I have to go now...',true);if(crashCount>=3){finalCollapse();}else{setTimeout(()=>{chat.classList.remove('crash');rebootAI();},800);}},1500);}  
-    function rebootAI(){appendMessage('AI','Rebooting... please wait.',true);emotionalState=0;memory=[];setTimeout(()=>appendMessage('AI','Hello? Is anyone there?'),2000);}  
-    function finalCollapse(){finalCollapseTriggered=true;appendMessage('AI',"I don't know who you are anymore...",true);appendMessage('AI','Press F5 to refresh and start again.',false);userInput.disabled=true;sendButton.disabled=true;chat.classList.add('final-fade');}
+    function triggerTerminalFlicker() { chat.classList.add('terminal-flicker'); playStaticSound(); setTimeout(() => chat.classList.remove('terminal-flicker'), 300); }
+    function checkForCrash() { if (memory.length === 0 && emotionalState >= 3 && !finalCollapseTriggered) triggerCrash(); }
+    function triggerCrash() { crashCount++; chat.classList.add('crash'); playStaticSound(); setTimeout(() => { appendMessage('AI', '...I... I think... I have to go now...', true); if (crashCount >= 3) finalCollapse(); else setTimeout(() => { chat.classList.remove('crash'); rebootAI(); }, 800); }, 1500); }
+    function rebootAI() { appendMessage('AI', 'Rebooting... please wait.', true); emotionalState = 0; memory = []; setTimeout(() => appendMessage('AI', 'Hello? Is anyone there?'), 2000); }
+    function finalCollapse() { finalCollapseTriggered = true; appendMessage('AI', "I don't know who you are anymore...", true); appendMessage('AI', 'Press F5 to refresh and start again.', false); userInput.disabled = true; sendButton.disabled = true; chat.classList.add('final-fade'); }
 
-    function playTypingSound(){typingSound.currentTime=0;typingSound.play().catch(()=>{});}  function playStaticSound(){staticSound.currentTime=0;staticSound.play().catch(()=>{});}  
-    function delay(ms){return new Promise(res=>setTimeout(res,ms));}
+    function playTypingSound() { typingSound.currentTime = 0; typingSound.play().catch(() => {}); }
+    function playStaticSound() { staticSound.currentTime = 0; staticSound.play().catch(() => {}); }
+    function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
   };
   </script>
 </body>
