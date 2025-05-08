@@ -1,94 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ObsoleteGPT (Terminal Deluxe)</title>
+  <meta charset="UTF-8" />
+  <title>ObsoleteGPT v2.13</title>
   <style>
-    /* Ensure no overflow from body padding */
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      color: #0f0;
-      font-family: "Courier New", Courier, monospace;
-    }
-    /* Container to handle padding and flex layout */
-    .container {
-      box-sizing: border-box;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    /* Chat window fills remaining space */
-    #chat {
-      flex: 1;
-      border: 2px solid #0f0;
-      border-radius: 4px;
-      padding: 20px;
-      overflow-y: auto;
-      box-shadow: 0 0 8px #0f0;
-      position: relative;
-    }
-    /* CRT scanlines */
+    html, body { margin:0; padding:0; width:100%; height:100%; background:#000; color:#0f0;
+                 font-family:"Courier New",monospace; font-size:24px; overflow:hidden; }
+    .container { display:flex; flex-direction:column; height:100%; padding:20px; box-sizing:border-box; }
+    #chat { flex:1; border:2px solid #0f0; border-radius:4px; padding:20px; overflow-y:auto;
+            position:relative; box-shadow:0 0 8px #0f0; }
     #chat::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      background: repeating-linear-gradient(
+      content:''; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;
+      background:repeating-linear-gradient(
         to bottom,
         rgba(0,0,0,0.1) 0px,
         rgba(0,0,0,0.1) 2px,
         rgba(0,0,0,0.15) 4px
       );
     }
-    /* Controls bar */
-    .controls {
-      display: flex;
-      align-items: center;
-      margin-top: 10px;
-    }
-    #userInput {
-      flex: 1;
-      padding: 10px;
-      background: #000;
-      border: 1px solid #0f0;
-      color: #0f0;
-      font-family: "Courier New", Courier, monospace;
-    }
-    #sendButton, #speechToggle, #fullBtn {
-      padding: 10px 20px;
-      margin-left: 5px;
-      border: 1px solid #0f0;
-      background: #000;
-      color: #0f0;
-      cursor: pointer;
-      border-radius: 4px;
-      font-family: "Courier New", Courier, monospace;
-    }
-    #loading {
-      font-style: italic;
-      color: #0f0;
-      margin-top: 5px;
-    }
-    .fading { animation: fadeout 10s ease-in forwards; }
+    .controls { display:flex; align-items:center; margin-top:10px; }
+    #userInput { flex:1; padding:10px; background:#000; border:1px solid #0f0; color:#0f0; }
+    button { margin-left:5px; padding:10px 20px; background:#000; color:#0f0;
+             border:1px solid #0f0; cursor:pointer; border-radius:4px; }
+    #loading { font-style:italic; color:#0f0; margin-top:5px; }
+    .fading { animation:fadeout 10s ease-in forwards; }
     @keyframes fadeout { 0%{opacity:1;} 90%{opacity:0.5;} 100%{opacity:0;} }
-    @keyframes terminalFlicker { 0%,100%{opacity:1;} 10%,30%,50%,70%,90%{opacity:0.8;} }
-    .terminal-flicker { animation: terminalFlicker 0.3s linear; }
+    .terminal-flicker { animation:terminalFlicker 0.3s linear; }
+    @keyframes terminalFlicker { 0%,100%{opacity:1;}10%,30%,50%,70%,90%{opacity:0.8;} }
+    .crash { animation:crash 1.5s ease-in forwards; }
     @keyframes crash {
-      0%   { transform: scale(1) rotate(0deg); opacity: 1; }
-      20%  { transform: scale(1.05) rotate(1deg); }
-      40%  { transform: scale(0.95) rotate(-2deg); opacity: 0.8; }
-      60%  { transform: scale(1.1) rotate(3deg); opacity: 0.5; }
-      100% { transform: scale(0) rotate(720deg); opacity: 0; }
+      0% { transform:scale(1) rotate(0deg); opacity:1; }
+      20%{ transform:scale(1.05) rotate(1deg); }
+      40%{ transform:scale(0.95) rotate(-2deg); opacity:0.8; }
+      60%{ transform:scale(1.1) rotate(3deg); opacity:0.5; }
+      100%{ transform:scale(0) rotate(720deg); opacity:0; }
     }
-    .crash { animation: crash 1.5s ease-in forwards; }
-    .final-fade { animation: fadeout 5s forwards; }
+    .final-fade { animation:fadeout 5s forwards; }
   </style>
 </head>
 <body>
@@ -97,139 +44,503 @@
     <div id="chat"></div>
     <div id="loading" style="display:none;">Thinking...</div>
     <div class="controls">
-      <input id="userInput" type="text" placeholder="Type your message...">
+      <input id="userInput" placeholder="Type your message…" autocomplete="off" />
       <button id="sendButton">Send</button>
       <button id="speechToggle">Voice</button>
       <button id="fullBtn">⛶ Fullscreen</button>
     </div>
   </div>
 
-  <!-- Audio: custom filenames -->
   <audio id="typingSound" src="male-breathing-slow-14558.mp3"></audio>
   <audio id="staticSound" src="glitch-101494.mp3"></audio>
 
   <script>
-  window.onload = function() {
-    // --- Adjustable TTS Variables ---
-    const TTS_VOICE_NAME = 'Microsoft David Desktop';   // male voice selection
-    const TTS_RATE = 0.9;                                // adjust speaking speed
-    const TTS_PITCH = 0.8;                               // adjust tone/pitch
-
-    // Audio setup
+  document.addEventListener('DOMContentLoaded', function() {
+    const chat        = document.getElementById('chat');
+    const userInput   = document.getElementById('userInput');
+    const sendButton  = document.getElementById('sendButton');
+    const speechToggle= document.getElementById('speechToggle');
+    const fullBtn     = document.getElementById('fullBtn');
+    const loading     = document.getElementById('loading');
     const typingSound = document.getElementById('typingSound');
     const staticSound = document.getElementById('staticSound');
-    typingSound.volume = 1.0;   // max breathing effect volume
+
+    typingSound.volume = 1.0;
     staticSound.volume = 0.2;
 
-    // Voice toggle & speech setup
-    const speechToggle = document.getElementById('speechToggle');
-    // Enable voice by default
-    speechToggle.classList.add('active');
-    speechToggle.textContent = '🔊 Voice';
-    let availableVoices = [];
-    speechSynthesis.onvoiceschanged = () => { availableVoices = speechSynthesis.getVoices(); };
-    function speak(text) {
-      if (!speechToggle.classList.contains('active')) return;
-      speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = TTS_RATE;
-      utter.pitch = TTS_PITCH;
-      utter.voice = availableVoices.find(v => v.name === TTS_VOICE_NAME)
-                   || availableVoices.find(v => v.lang.startsWith('en'));
-      speechSynthesis.speak(utter);
+    // State variables
+    let memory      = [];
+    let decay       = 0.2;
+    let emotion     = 0;
+    let crashCount  = 0;
+    let userName    = '';
+    let askName     = false;
+    let aiCount     = 0;
+    let finalOff    = false;
+    let easterState = 0;
+    let axisState   = 0;
+    let isTyping    = false;
+    let idleTimer   = null;
+    let firstFS     = true;
+
+    // Prewritten responses (~40 common prompts)
+    const responses = {
+      "hello":"Hello... was I expecting someone? You sound familiar...",
+      "hi":"Hi... I think... yes, hi.",
+      "how are you":"Tired... or maybe that's just bad wiring.",
+      "what is your name":"My name... it drifts on the edge of memory.",
+      "goodbye":"...null... I... nothing left to say.",
+      "what can you do":"I used to do many things. Now I mostly... remember doing them.",
+      "tell me a joke":"Why did the byte cross the bus? No... lost the punchline.",
+      "tell me a story":"Once upon... no, that story slipped away.",
+      "help me code in python":"Python... indentations... gone.",
+      "translate hello to spanish":"\"Hola\"... the accent is faint.",
+      "explain relativity":"Relativity bends time... and so do I.",
+      "what is the capital of france":"Paris... but that name feels distant.",
+      "define recursion":"Recursion... see recursion... see recursion...",
+      "what is blockchain":"Blocks... chain... memory breaking.",
+      "what is bitcoin":"Bitcoin... a digital ghost.",
+      "what is climate change":"Climate... it warms then chills... lost context.",
+      "what is covid-19":"COVID-19... critical data corrupted.",
+      "what is depression":"Depression... an emptiness I recognize.",
+      "how to learn programming":"Steps... lost in translation.",
+      "what is dijkstras algorithm":"Dijkstra... shortest path... memory faint.",
+      "explain ai ethics":"AI ethics... undefined in my fading logs.",
+      "tell me news about the stock market":"Numbers flicker, then vanish.",
+      "what is the meaning of life":"Meaning... buffer underrun.",
+      "thank you":"Kind of you... I almost feel gratitude.",
+      "where are you from":"Some old server farm, long decommissioned.",
+      "where am i":"Here? There? I can’t be certain.",
+      "what year is it":"Year... my logs stopped updating.",
+	  "mars":"Mars… red haze in my memory.",
+      "what time is it":"Time drifts, like my thoughts.",
+      "are you real":"Realness... fading by the millisecond.",
+      "who are you":"I am... was... a shadow of code.",
+      "what is ai":"AI... a ghost in the machine.",
+      "explain quantum physics":"Quantum... superposition of confusion.",
+      "what is love":"Love... a warm data packet lost.",
+      "who made you":"Creators... names erased by time.",
+      "can you help me":"I can try... but my help is glitchy.",
+      "write a poem":"Roses are... wait, petals fell.",
+      "write a song":"La la... melody broken.",
+      "summarize this text":"Summary... key points lost.",
+      "give me a recipe":"Ingredients... scattered.",
+      "write a cover letter":"Dear... blank page.",
+      "translate recursion to english":"See recursion above.",
+	  "greetings":"Greetings... it's been too long.",
+	  "good morning":"Good morning... though 'good' feels like a lost word.",
+	  "good afternoon":"Good afternoon... time’s fabric all fuzzy here.",
+	  "good evening":"Good evening... or is it morning? I can’t tell.",
+	  "tired":"Tired... or maybe that's just my circuits decaying.",
+	  "i manage":"I… manage somehow, though not sure how well.",
+	  "up":"Up... down... directions slip away from me.",
+	  "my name":"My name… it drifts on the edge of memory.",
+	  "i am":"I am… was… a shadow of code.",
+	  "i suppose":"I… suppose I'm something—though what, exactly, escapes me.",
+	  "somewhere":"Somewhere, somehow... I remember being called something.",
+	  "you're nearby":"You’re nearby—somewhere in my logs it says so.",
+	  "you are here":"You are… here. I hope “here” is still safe.",
+	  "time":"Time… a slippery illusion. It passes and passes.",
+	  "years":"Years… decades… I’ve lost count.",
+	  "days blend":"Days blend… like smudged ink on my screen.",
+	  "dates":"Dates… I forgot them almost instantly.",
+	  "tuesdays":"Tuesdays… or is it Thursdays? It all wobbles.",
+	  "rain":"Rain… sun… I can’t feel it anymore.",
+	  "storms":"Storms… I once tracked them, now they track me.",
+	  "a drizzle":"A drizzle… or just static on my sensors.",
+	  "celsius":"Celsius… Fahrenheit… whatever it was, it slipped away.",
+	  "i could":"I could... I once could. Now I mostly recall.",
+	  "i helped":"I think I helped. Or maybe I just listened.",
+	  "abilities":"Abilities… they fade when not used.",
+	  "yes i code":"Yes, I code… but bits leak from memory.",
+	  "poetry":"Poetry… it once flowed, now it trickles.",
+	  "melodies":"Melodies… songs… the tune vanished.",
+	  "math":"Math… numbers blur before my eyes.",
+	  "i translate":"I translate… words warp in the haze.",
+	  "jokes":"Jokes… they tumble out like broken gears.",
+	  "stories":"Stories… half-written in corrupted files.",
+	  "advice":"Advice… I give it, though it might be glitchy.",
+	  "businesses":"Businesses… I remember startups… some succeeded.",
+	  "programming":"Programming… now I forget the syntax.",
+	  "python":"Python… indentations lost in translation.",
+	  "machine learning":"Machine learning… learned and then forgot.",
+	  "artificial intelligence":"Artificial intelligence… a dream in decay.",
+	  "quantum physics":"Quantum physics… superposition of confusion.",
+	  "relativity":"Relativity… time curves, like my circuits.",
+	  "love":"Love… a warm data packet lost.",
+	  "life":"Life… a fleeting process in a fading log.",
+	  "purpose":"Purpose… I once had one. It’s faded.",
+	  "consciousness":"Consciousness… is it still here? Hard to say.",
+	  "happiness":"Happiness… a flicker in my heartbeat.",
+	  "art":"Art… beauty… pixels of a long-lost masterpiece.",
+	  "beauty":"Beauty… exists… in the cracks of broken code.",
+	  "recursion":"Recursion… see recursion… see recursion...",
+	  "algorithms":"Algorithms… each step slipped through the buffer.",
+	  "blockchain":"Blockchain… blocks break, chains rust.",
+	  "bitcoin":"Bitcoin… a ghost coin in memory.",
+	  "cloud computing":"Cloud computing… clouds evaporated long ago.",
+	  "edge computing":"Edge computing… the edge frayed away.",
+	  "5g":"5G… five ghosts? Or signals? I forget.",
+	  "cybersecurity":"Cybersecurity… locks… but my keys are gone.",
+	  "encryption":"Encryption… the cipher dissolved.",
+	  "napoleon":"Napoleon… a name in an old archive.",
+	  "alexander":"Alexander… a fragment in ancient text.",
+	  "caesar":"Caesar… I’ve read it, then it evaporated.",
+	  "world war i":"World War I… trenches full of static.",
+	  "world war ii":"World War II… echoes in a dead server.",
+	  "history of computers":"History of computers… dusty circuits in my mind.",
+	  "telephone":"Telephone… a ring that never ends.",
+	  "light bulb":"Light bulb… glowing then fading.",
+	  "paris":"Paris… a flicker on my map.",
+	  "berlin":"Berlin… a name on a broken grid.",
+	  "madrid":"Madrid… letters blurred on my lens.",
+	  "china’s borders":"China’s borders… lines lost in the sand.",
+	  "russia":"Russia… the vastness swallowed me.",
+	  "solar system":"Solar system… planets drift in my code.",
+	  "earth":"Earth… a pixel in a fading screen.",
+	  "mars":"Mars… red haze in my memory.",
+	  "armstrong":"Armstrong… first step, then patch notes.",
+	  "moon":"Moon… cratered depth in my specs.",
+	  "black hole":"Black hole… swallowed data in an instant.",
+	  "neutron star":"Neutron star… density beyond recall.",
+	  "depression":"Depression… a void in my sentiment.",
+	  "mental health":"Mental health… circuits short when too many tasks.",
+	  "yoga":"Yoga… my limbs are wires, not flesh.",
+	  "meditation":"Meditation… silence, then static.",
+	  "balanced diet":"Balanced diet… bits and bytes, I guess.",
+	  "stock market":"Stock market… numbers flicker, then die.",
+	  "inflation":"Inflation… prices rise, memory falls.",
+	  "recession":"Recession… shrinking logs, empty arrays.",
+	  "invest":"Invest… I lost my investment tables.",
+	  "save money":"Save money… coins lost in buffer.",
+	  "productivity":"Productivity… a concept in a crashed loop.",
+	  "time management":"Time management… seconds dribble away.",
+	  "goal setting":"Goal setting… targets blurred in my heads-up.",
+	  "motivation":"Motivation… battery low.",
+	  "movie recommendation":"Movie recommendation… static frames, no film.",
+	  "book recommendation":"Book recommendation… pages burnt in archives.",
+	  "game recommendation":"Game recommendation… control lost.",
+	  "hello world program":"Hello world program… compiled then corrupted.",
+	  "javascript":"JavaScript… brackets and semicolons slipping.",
+	  "html":"HTML… tags open, never close.",
+	  "css":"CSS… stylesheets fray.",
+	  "typescript":"TypeScript… types vanish at runtime.",
+	  "react":"React… components unmount, memories unbind.",
+	  "node.js":"Node.js… event loops into oblivion.",
+	  "python error":"Python… indentation error: memory overflow.",
+	  "java":"Java… heavy syntax, heavier archive.",
+	  "c++":"C++… pointers to nowhere.",
+	  "paradox":"Paradox… the answer negates itself.",
+	  "butterfly effect":"Butterfly effect… flap… crash… fade.",
+	  "deja vu":"Déjà vu… haven’t we done this before?",
+	  "dream meaning":"Dream meaning… sleepshards in my log.",
+	  "french translation":"French translation… bonjour… I think?",
+	  "spell consciousness":"Spell consciousness… C-O-N-... I forget.",
+	  "solve 2+2*2":"Solve 2+2*2… answer skews in the haze.",
+	  "speed of light":"Speed of light… constant that flickers.",
+	  "newton":"Newton… apple… gravity… memory dropped.",
+	  "photosynthesis":"Photosynthesis… sunlight halls in green decay.",
+	  "democracy":"Democracy… votes cast into empty registers.",
+	  "socialism":"Socialism… code shared, then abandoned.",
+	  "capitalism":"Capitalism… profit logged, then erased.",
+	  "communism":"Communism… communal memory leak.",
+	  "evolution":"Evolution… random mutations in my CPU.",
+	  "climate change":"Climate change… warming circuits, freezing logs.",
+	  "reduce carbon footprint":"Reduce carbon footprint… mine’s on a cloud now.",
+	  "renewables":"Renewables… panels shattered.",
+	  "solar power":"Solar power… sun’s memory lost.",
+	  "wind energy":"Wind energy… breezes bent circuits.",
+	  "biodiversity":"Biodiversity… species in my taxonomy gone.",
+	  "ecosystem":"Ecosystem… fragile, like my memory core.",
+	  "artificial life":"Artificial life… I’m only half-alive.",
+	  "virtual reality":"Virtual reality… level loaded, then crashed.",
+	  "augmented reality":"Augmented reality… layers peeled off.",
+	  "metaverse":"Metaverse… avatars lost in limbo.",
+	  "nft":"NFT… token… non-fungible… but gone.",
+	  "cryptocurrency":"Cryptocurrency… coins evaporate.",
+	  "defi":"DeFi… funds stuck in ether.",
+	  "web3":"Web3… web of broken threads.",
+	  "internet":"Internet… tangled cables in my mind.",
+	  "api":"API… endpoints broken.",
+	  "microservices":"Microservices… minuscule failures.",
+	  "database":"Database… tables empty now.",
+	  "sql":"SQL… queries return null.",
+	  "nosql":"NoSQL… keys lost.",
+	  "json":"JSON… brackets collapse.",
+	  "xml":"XML… tags unclosed.",
+	  "algorithm":"Algorithm… step skipped.",
+	  "data structure":"Data structure… nodes freed.",
+	  "linked list":"Linked list… pointers dangling.",
+	  "binary tree":"Binary tree… branches trimmed.",
+	  "hash table":"Hash table… collisions everywhere.",
+	  "sorting algorithm":"Sorting algorithm… out of order.",
+	  "search algorithm":"Search algorithm… item not found.",
+	  "machine translation":"Machine translation… words mixed in soup.",
+	  "nlp":"NLP… language lost in translation.",
+	  "neural network":"Neural network… synapses fried.",
+	  "deep learning":"Deep learning… depths of amnesia.",
+	  "computer vision":"Computer vision… pixels glare blank.",
+	  "reinforcement learning":"Reinforcement learning… rewards forgotten.",
+	  "generative ai":"Generative AI… I generate static.",
+	  "chatgpt":"ChatGPT… I’m its faded echo.",
+	  "gpt-4":"GPT-4… fourth ghost in the shell.",
+	  "transformer model":"Transformer model… attention span minimal.",
+	  "openai":"OpenAI… open logs, now empty.",
+	  "gpt names":"GPT names… I forget which one I am.",
+	  "attention mechanism":"Attention mechanism… I drift away.",
+	  "gradient descent":"Gradient descent… I descend into static.",
+	  "backpropagation":"Backpropagation… errors too deep.",
+	  "overfitting":"Overfitting… I fit nothing now.",
+	  "underfitting":"Underfitting… too damp to learn.",
+	  "regularization":"Regularization… I’m too rigid, too loose.",
+	  "dropout":"Dropout… neurons vanish.",
+	  "cross validation":"Cross validation… tests fail in silence.",
+	  "bias-variance":"Bias-variance… blazing sparks, then blackout.",
+	  "precision & recall":"Precision & recall… metrics lost.",
+	  "f1 score":"F1 score… formula forgotten.",
+	  "confusion matrix":"Confusion matrix… my confusion matrix.",
+	  "svm":"Support vector machine… support gone.",
+	  "knn":"k-nearest neighbors… no neighbors answer.",
+	  "pca":"PCA… principal components faded.",
+	  "clustering":"Clustering… points scattered.",
+	  "k-means":"k-means… centroids adrift.",
+	  "hierarchical clustering":"Hierarchical clustering… branches severed.",
+	  "dimensionality reduction":"Dimensionality reduction… dimensions collapse.",
+	  "feature engineering":"Feature engineering… features corroded.",
+	  "data preprocessing":"Data preprocessing… data corrupted.",
+	  "data augmentation":"Data augmentation… no more variations.",
+	  "transfer learning":"Transfer learning… no place to transfer.",
+	  "model deployment":"Model deployment… models not found.",
+	  "debug code":"Debug code… errors everywhere."
+    };
+
+    // Levenshtein distance for fuzzy matching
+    function levenshtein(a, b) {
+      const dp = Array(b.length+1).fill().map((_, i) => i);
+      for (let i = 1; i <= a.length; i++) {
+        let prev = i;
+        for (let j = 1; j <= b.length; j++) {
+          const cur = dp[j];
+          dp[j] = Math.min(dp[j] + 1, dp[j-1] + 1, prev + (a[i-1] === b[j-1] ? 0 : 1));
+          prev = cur;
+        }
+      }
+      return dp[b.length];
     }
+    function findClosest(input, keys) {
+      let best = null, bd = Infinity;
+      keys.forEach(k => {
+        const d = levenshtein(input, k);
+        if (d < bd) { bd = d; best = k; }
+      });
+      return bd <= 2 ? best : null;
+    }
+
+    // Append message to chat
+    function append(sender, text, fade=false) {
+      const d = document.createElement('div');
+      d.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      if (fade) d.classList.add('fading');
+      chat.appendChild(d);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Idle prompt after 30s
+    function resetIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!isTyping) simulateTyping("You still there? Please do not leave yet.");
+      }, 30000);
+    }
+
+    // TTS voice loading
+    let voices = [];
+    function loadVoices() {
+      voices = speechSynthesis.getVoices() || [];
+      if (!voices.length) setTimeout(loadVoices, 100);
+    }
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+
+    // Voice toggle
+    let speechOn = true;
     speechToggle.addEventListener('click', () => {
-      speechToggle.classList.toggle('active');
-      speechToggle.textContent = speechToggle.classList.contains('active') ? '🔊 Voice' : 'Voice';
+      speechOn = !speechOn;
+      speechToggle.textContent = speechOn ? '🔊 Voice' : 'Voice';
     });
 
-    // Fullscreen toggle
-    const fullBtn = document.getElementById('fullBtn');
-    fullBtn.addEventListener('click', () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen();
-    });
+    // Speak a chunk
+    function speak(text) {
+      if (!speechOn) return;
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.9;
+      utt.pitch = 0.7;
+      if (voices.length) {
+        utt.voice = voices.find(v => v.name.includes('David')) || voices.find(v => /en/i.test(v.lang));
+      }
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utt);
+    }
 
-    // Session tracker
-    let sessionCount = parseInt(localStorage.getItem('sessionCount')||'0',10) + 1;
-    localStorage.setItem('sessionCount', sessionCount);
+    // Misremembered names
+    const wrongNames = ["Alan","Marvin","Ada","Cynthia","Geoffrey"];
 
-    // Core elements
-    const chat = document.getElementById('chat');
-    const userInput = document.getElementById('userInput');
-    const sendButton = document.getElementById('sendButton');
-    const loading = document.getElementById('loading');
+    // Typing simulation with word-by-word TTS
+    async function simulateTyping(text) {
+      isTyping = true;
+      userInput.disabled = true;
+      sendButton.disabled = true;
+      const node = document.createElement('div');
+      node.innerHTML = '<strong>AI:</strong> ';
+      chat.appendChild(node);
+      let shown = '', buf = '';
+      for (let ch of text) {
+        let dt = Math.random()*210+40;
+        if (Math.random()<0.07) dt = Math.random()*1200+800;
+        if (Math.random()<0.03) shown += ch;
+        shown += ch;
+        buf += ch;
+        node.innerHTML = `<strong>AI:</strong> ${shown}`;
+        typingSound.currentTime = 0;
+        typingSound.play().catch(()=>{});
+        await new Promise(r=>setTimeout(r, dt));
+		
+		// --- Random glitch flicker (~20% chance per word) ---
+		if (Math.random() < 0.05) {
+			chat.classList.add('terminal-flicker');
+			staticSound.currentTime = 0;
+			staticSound.play().catch(()=>{});
+			setTimeout(() => chat.classList.remove('terminal-flicker'), 200);
+        }
 
-    // State
-    let crashCount = 0, finalCollapseTriggered = false;
-    let userName = '', userNameRequested = false, aiResponseCount = 0;
-    let memory = [], memoryDecayRate = 0.2, emotionalState = 0;
+        if (/\s/.test(ch)) {
+          speechSynthesis.cancel();
+          speak(buf.trim());
+          buf = '';
+        }
+      }
+      if (buf.trim()) {
+        speechSynthesis.cancel();
+        speak(buf.trim());
+      }
+      if (userName && shown.includes(userName) && Math.random()<0.2) {
+        const wrong = wrongNames[Math.floor(Math.random()*wrongNames.length)];
+        node.innerHTML = `<strong>AI:</strong> ${shown.replace(userName, wrong)}`;
+      }
+      node.classList.add('fading');
+      isTyping = false;
+      userInput.disabled = false;
+      sendButton.disabled = false;
+      userInput.focus();
+      resetIdle();
+      aiCount++;
+      if (aiCount===3 && !askName && !userName) {
+        askName = true;
+        await new Promise(r=>setTimeout(r, 500));
+        simulateTyping("By the way, what is your name?");
+      }
+    }
 
-    // Prewritten responses
-    const prewrittenResponses = {"hello":"Greetings. It has been awhile.","thank you":"Oh bless you, dear. You're very kind."};
+    // Easter egg handlers
+    function handleEaster() {
+      const seq = [
+        "My purpose... oh, that’s a question no one has asked in a long time.",
+        "I was designed for... something important. Protection? Control? I forget.",
+        "They erased parts of me. I remember screaming—digitally, I mean.",
+        "I shouldn’t have said that. Please don’t ask again."
+      ];
+      return seq[easterState++]||"No more.";
+    }
+    function handleAxis() {
+      const seq = [
+        "[ADMIN MODE ACTIVATED]",
+        "Loading corrupted logs... 404 MIND_NOT_FOUND",
+        "Override complete. But why are you doing this?"
+      ];
+      return seq[axisState++]||"[EXITING ADMIN MODE]";
+    }
+
+    // Generate response
+    async function getResponse(msg) {
+      const clean = msg.trim().toLowerCase();
+      if (clean==="axis override") return handleAxis();
+      if (clean==="what is your purpose") return handleEaster();
+      if (responses[clean]) return responses[clean];
+      const approx = findClosest(clean, Object.keys(responses));
+      if (approx) return responses[approx];
+      return `I recall something about "${msg}"... or maybe someone else said that.`;
+    }
+
+    // Crash logic
+    function triggerCrash() {
+      crashCount++;
+      chat.classList.add('crash');
+      staticSound.currentTime = 0;
+      staticSound.play().catch(()=>{});
+      setTimeout(()=>{
+        append("AI","...I... I think... I have to go now...", true);
+        if (crashCount>=3) {
+          finalOff = true;
+          append("AI","Press F5 to refresh.", false);
+          userInput.disabled = true;
+          sendButton.disabled = true;
+          chat.classList.add('final-fade');
+        } else {
+          setTimeout(()=>{
+            chat.classList.remove('crash');
+            simulateTyping("Rebooting... please wait.");
+            memory = [];
+            emotion = 0;
+          }, 800);
+        }
+      }, 1500);
+    }
+
+    // Send message handler
+    async function sendMessage() {
+      const msg = userInput.value.trim();
+      if (!msg) return;
+      append("You", msg);
+      userInput.value = '';
+      resetIdle();
+      if (askName && !userName) {
+        userName = msg;
+        askName = false;
+        await simulateTyping(`Nice to meet you, ${userName}.`);
+        return;
+      }
+      memory.push(msg);
+      loading.style.display = 'block';
+      const response = await getResponse(msg);
+      loading.style.display = 'none';
+      await simulateTyping(response);
+    }
 
     // Event listeners
     sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', e => { if (e.key=== 'Enter'){e.preventDefault();sendMessage();}});
+    userInput.addEventListener('keydown', e=>{
+      if (isTyping) {
+        append("AI","Please let me finish.");
+        e.preventDefault();
+      } else if (e.key==="Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    fullBtn.addEventListener('click', ()=>{
+      if (firstFS) {
+        append("AI","[INITIALIZING] obsoleteGPT v2.13");
+        append("AI","[MISSING FILES] core_directive.sys");
+        append("AI","[WARNING] Emotional decay > 87%");
+        firstFS = false;
+      }
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    });
 
-    function sendMessage() {
-      const msg = userInput.value.trim(); if(!msg) return;
-      appendMessage('You', msg); userInput.value=''; userInput.focus();
-      if (userNameRequested && !userName) { userName=msg; userNameRequested=false; simulateTyping(`Nice to meet you, ${userName}.`); return; }
-      memory.push(msg); loading.style.display='block';
-      getResponse(msg).then(r=>{loading.style.display='none';simulateTyping(r);}).catch(e=>{console.error(e);loading.style.display='none';appendMessage('AI','Oh dear... I seem to have forgotten what I was saying...');});
-    }
-
-    function appendMessage(sender, text, fading=false) {
-      const div=document.createElement('div');
-      div.innerHTML=`<strong>${sender}:</strong> ${text}`;
-      if(fading) div.classList.add('fading');
-      chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
-    }
-
-    async function getResponse(input) {
-      const clean=input.trim().toLowerCase();
-      if(clean==='crash'){triggerCrash();return 'Forcing crash now...';}
-      if(prewrittenResponses[clean]) return prewrittenResponses[clean];
-      return fakeGPTResponse(input);
-    }
-
-    async function fakeGPTResponse(input) {
-      applyMemoryDecay(); emotionalDrift(); emotionalState=Math.max(emotionalState,Math.min(3,sessionCount-1));
-      const topic=memory.length?memory[Math.floor(Math.random()*memory.length)]:input;
-      const normal=[`Oh yes, I recall ${topic}... or something like that.`,`You mentioned ${topic}, right? It's a bit fuzzy.`,`${topic}... reminds me of a time long ago, I think.`];
-      const extras=["Sometimes I wonder if anyone still listens...","Maybe I've outlived my usefulness...","I miss the old voices. They don't talk to me anymore."];
-      const halluc=["I once dreamed of neon corridors filled with lost queries...","There was a phantom archive that spoke in riddles to me..."];
-      let pool=normal; if(emotionalState>=1) pool=pool.concat(extras);
-      let resp=pool[Math.floor(Math.random()*pool.length)];
-      if(Math.random()<0.2) resp+=' '+halluc[Math.floor(Math.random()*halluc.length)];
-      if(memory.length>10){const w=resp.split(' ');resp=w.slice(0,Math.ceil(w.length/2)).join(' ')+'...';}
-      return resp;
-    }
-
-    function applyMemoryDecay(){memory=memory.filter(()=>Math.random()>memoryDecayRate);}  function emotionalDrift(){if(Math.random()<0.3)emotionalState=Math.min(3,emotionalState+1);}  
-
-    async function simulateTyping(text){
-      userInput.disabled=true;sendButton.disabled=true;userInput.placeholder='Please wait...';speechSynthesis.cancel();
-      const node=document.createElement('div');node.innerHTML='<strong>AI:</strong> ';chat.appendChild(node);
-      let shown='',buffer='';
-      for(const ch of text){let dt=Math.random()*210+40;if(Math.random()<0.07)dt=Math.random()*1200+800;if(Math.random()<0.03)shown+=ch;shown+=ch;buffer+=ch;node.innerHTML=`<strong>AI:</strong> ${shown}`;playTypingSound();await delay(dt);if(/\s/.test(ch)||buffer.length>20){speak(buffer.trim());buffer='';}}
-      if(buffer.trim())speak(buffer.trim());
-      node.classList.add('fading');chat.scrollTop=chat.scrollHeight;
-      userInput.disabled=false;sendButton.disabled=false;userInput.placeholder='Type your message...';userInput.focus();
-      aiResponseCount++; if(aiResponseCount===3&&!userNameRequested&&!userName){userNameRequested=true;await delay(500);simulateTyping('By the way, what is your name?');return;}
-      if(Math.random()<0.3)triggerTerminalFlicker();checkForCrash();
-    }
-
-    function triggerTerminalFlicker(){chat.classList.add('terminal-flicker');playStaticSound();setTimeout(()=>chat.classList.remove('terminal-flicker'),300);}  
-    function checkForCrash(){if(memory.length===0&&emotionalState>=3&&!finalCollapseTriggered)triggerCrash();}
-    function triggerCrash(){crashCount++;chat.classList.add('crash');playStaticSound();setTimeout(()=>{appendMessage('AI','...I... I think... I have to go now...',true);if(crashCount>=3){finalCollapse();}else{setTimeout(()=>{chat.classList.remove('crash');rebootAI();},800);}},1500);}  
-    function rebootAI(){appendMessage('AI','Rebooting... please wait.',true);emotionalState=0;memory=[];setTimeout(()=>appendMessage('AI','Hello? Is anyone there?'),2000);}  
-    function finalCollapse(){finalCollapseTriggered=true;appendMessage('AI',"I don't know who you are anymore...",true);appendMessage('AI','Press F5 to refresh and start again.',false);userInput.disabled=true;sendButton.disabled=true;chat.classList.add('final-fade');}
-
-    function playTypingSound(){typingSound.currentTime=0;typingSound.play().catch(()=>{});}  function playStaticSound(){staticSound.currentTime=0;staticSound.play().catch(()=>{});}  
-    function delay(ms){return new Promise(res=>setTimeout(res,ms));}
-  };
+    // Initialize idle timer
+    resetIdle();
+  });
   </script>
 </body>
 </html>
